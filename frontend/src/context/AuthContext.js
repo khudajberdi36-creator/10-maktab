@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
 import axios from 'axios';
+import API_URL from '../config';
+
+axios.defaults.baseURL = API_URL;
 
 const AuthContext = createContext();
 
@@ -25,7 +28,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  // Set token on load
   const token = localStorage.getItem('token');
   if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
