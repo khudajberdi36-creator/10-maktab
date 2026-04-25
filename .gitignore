@@ -1,0 +1,4 @@
+node_modules/
+backend/teachers.db
+backend/uploads/*
+!backend/uploads/.gitkeep
