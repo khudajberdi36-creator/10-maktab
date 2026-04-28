@@ -2,12 +2,19 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database');
 const auth = require('../middleware/auth');
 
+// Uploads papkasi — doimiy saqlash uchun
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
 const upload = multer({ storage });
@@ -100,23 +107,23 @@ router.delete('/:id/certificates/:cid', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// Documents
+// Documents — ONID login/parol qo'shildi
 router.post('/:id/documents', auth, upload.fields([
   { name: 'file', maxCount: 10 }
 ]), async (req, res) => {
   try {
-    const { doc_type, doc_name, onid_number } = req.body;
+    const { doc_type, doc_name, onid_number, onid_login, onid_password } = req.body;
     const files = req.files?.file || [];
     if (files.length === 0) {
       await db.run_p(
-        'INSERT INTO documents (teacher_id,doc_type,doc_name,file_path,onid_number) VALUES (?,?,?,?,?)',
-        [req.params.id, doc_type, doc_name, null, onid_number || null]
+        'INSERT INTO documents (teacher_id,doc_type,doc_name,file_path,onid_number,onid_login,onid_password) VALUES (?,?,?,?,?,?,?)',
+        [req.params.id, doc_type, doc_name, null, onid_number||null, onid_login||null, onid_password||null]
       );
     } else {
       for (const f of files) {
         await db.run_p(
-          'INSERT INTO documents (teacher_id,doc_type,doc_name,file_path,onid_number) VALUES (?,?,?,?,?)',
-          [req.params.id, doc_type, doc_name, f.filename, onid_number || null]
+          'INSERT INTO documents (teacher_id,doc_type,doc_name,file_path,onid_number,onid_login,onid_password) VALUES (?,?,?,?,?,?,?)',
+          [req.params.id, doc_type, doc_name, f.filename, onid_number||null, onid_login||null, onid_password||null]
         );
       }
     }

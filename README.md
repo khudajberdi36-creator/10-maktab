@@ -1,101 +1,56 @@
-# 🏫 Maktab O'qituvchilar Ma'lumotlar Tizimi
+# O'zgartirilgan fayllar
 
-O'zbek tilida to'liq maktab o'qituvchilarini boshqarish tizimi.
+## Nima o'zgardi:
 
-## 📋 Xususiyatlari
+### Frontend fayllar (frontend/src/):
+1. **pages/TeacherDetail.js** — localhost → API_URL, ONID login/parol qo'shildi, ko'p hujjat turlari
+2. **pages/TeacherForm.js** — localhost → API_URL, Direktor va boshqa lavozimlar qo'shildi
+3. **pages/Teachers.js** — localhost → API_URL
+4. **pages/Documents.js** — localhost → API_URL, ONID login/parol ko'rsatish
+5. **pages/Dashboard.js** — localhost → API_URL
 
-- ✅ **Shaxsiy ma'lumotlar** — ism, familiya, tug'ilgan sana, foto
-- ✅ **Pasport ma'lumotlari** — seriya, raqam, berilgan sana, amal qilish muddati
-- ✅ **JSHSHIR** (14 raqamli ID)
-- ✅ **Mehnat daftarchasi** — raqam, oldingi ish joylari
-- ✅ **Diplom/Ta'lim** — oliy o'quv yurti, mutaxassislik, diplom raqami
-- ✅ **Sertifikatlar** — fayl yuklash, muddatni nazorat qilish
-- ✅ **Hujjatlar** — har qanday hujjatni yuklash
-- ✅ **3 ta rol** — Admin, Direktor, O'qituvchi
-- ✅ **Qidiruv** — ism, JSHSHIR, pasport raqami bo'yicha
+### Backend fayllar (backend/):
+6. **database.js** — onid_login, onid_password ustunlari qo'shildi, doimiy saqlash yo'li
+7. **routes/teachers.js** — ONID login/parol saqlash qo'shildi
 
----
+## Qanday joylash:
 
-## 🚀 O'rnatish va ishga tushirish
+### 1. Fayllarni ko'chiring
+Har bir faylni tegishli joyga ko'chiring:
+- frontend fayllarini → teacher-system/frontend/src/pages/ ga
+- backend fayllarini → teacher-system/backend/ ga
 
-### Talablar
-- Node.js 18+ (https://nodejs.org)
-
-### 1. Backend o'rnatish
-
+### 2. Push qiling
 ```bash
-cd backend
-npm install
-node server.js
+cd C:\Users\begzod\Desktop\teacher-system
+git add .
+git commit -m "feat: add director position, ONID credentials, fix API URLs"
+git push origin main
 ```
 
-Backend http://localhost:5000 da ishlaydi
+### 3. Ma'lumotlar doimiy saqlash (Render Disk)
+Render free plan da disk yo'q, shuning uchun server qayta ishga tushganda ma'lumotlar o'chadi.
+Yechim: Render da **Disk** qo'shing:
+- Render → 10-maktab-tt → Settings → Disks → Add Disk
+- Mount Path: /opt/render/project/data
+- Size: 1 GB (free plan yo'q, $0.25/GB/oy)
 
-### 2. Frontend o'rnatish (yangi terminal)
+Yoki bepul yechim: **Railway.app** ga o'ting (PostgreSQL bepul beradi).
 
-```bash
-cd frontend
-npm install
-npm start
-```
+## Yangi lavozimlar:
+- Direktor
+- O'quv ishlari bo'yicha direktor o'rinbosari
+- Tarbiya ishlari bo'yicha direktor o'rinbosari
+- Xo'jalik ishlari bo'yicha direktor o'rinbosari
+- Psixolog, Ijtimoiy pedagog, Kutubxonachi, Laborant, Buxgalter, Kotib va boshqalar
 
-Brauzer http://localhost:3000 da ochiladi
+## Yangi hujjat turlari:
+- Mehnat daftarchasi nusxasi
+- Attestatsiya varaqasi
+- Malaka oshirish guvohnomasi
+- Ta'lim to'g'risidagi guvohnoma
+- Kadrlar bo'yicha anketa
+- Avtobiografiya va boshqalar
 
----
-
-## 🔐 Demo hisoblar
-
-| Foydalanuvchi | Parol        | Rol           |
-|--------------|--------------|---------------|
-| admin        | admin123     | Administrator |
-| direktor     | direktor123  | Direktor      |
-| oquvchi      | oquvchi123   | O'qituvchi    |
-
----
-
-## 📁 Loyiha tuzilmasi
-
-```
-teacher-system/
-├── backend/
-│   ├── server.js          — Asosiy server
-│   ├── database.js        — SQLite ma'lumotlar bazasi
-│   ├── middleware/
-│   │   └── auth.js        — JWT autentifikatsiya
-│   ├── routes/
-│   │   ├── auth.js        — Login/register
-│   │   ├── teachers.js    — O'qituvchilar CRUD
-│   │   └── dashboard.js   — Statistika
-│   └── uploads/           — Yuklangan fayllar
-│
-└── frontend/
-    └── src/
-        ├── App.js          — Asosiy ilova
-        ├── App.css         — Dizayn
-        ├── context/
-        │   └── AuthContext.js
-        ├── components/
-        │   └── Layout.js   — Sidebar + topbar
-        └── pages/
-            ├── Login.js
-            ├── Dashboard.js
-            ├── Teachers.js
-            ├── TeacherForm.js
-            └── TeacherDetail.js
-```
-
----
-
-## 🛠 Texnologiyalar
-
-- **Frontend**: React 18, React Router, Axios
-- **Backend**: Node.js, Express.js
-- **Ma'lumotlar bazasi**: SQLite (better-sqlite3)
-- **Autentifikatsiya**: JWT (JSON Web Token)
-- **Fayl yuklash**: Multer
-
----
-
-## 📞 Qo'llab-quvvatlash
-
-Savollar va takliflar uchun murojaat qiling.
+## ONID da login/parol:
+Hujjat turini "ONID" tanlasangiz, ONID raqami, login va parol kiritish maydonlari chiqadi.

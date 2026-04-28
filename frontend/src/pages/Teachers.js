@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import API_URL from '../config';
 
 const SUBJECTS = ['Matematika','Fizika','Kimyo','Biologiya','Tarix','Geografiya','Adabiyot',
   'Ona tili','Ingliz tili','Rus tili','Informatika','Jismoniy tarbiya','Musiqa','Boshqa'];
@@ -34,7 +35,6 @@ export default function Teachers() {
     load();
   };
 
-  // Excel eksport
   const exportExcel = () => {
     const headers = ['#','Familiya','Ism','Otasining ismi','Tug\'ilgan sana','Jinsi',
       'Pasport','JSHSHIR','Telefon','Email','Manzil','Lavozim','Fan','Sinf rahbari',
@@ -72,7 +72,7 @@ export default function Teachers() {
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
         <div>
           <h2 style={{fontSize:20, fontWeight:800}}>O'qituvchilar ro'yxati</h2>
-          <p style={{fontSize:13, color:'var(--text-muted)'}}>Jami: {filtered.length} ta o'qituvchi</p>
+          <p style={{fontSize:13, color:'var(--text-muted)'}}>Jami: {filtered.length} ta xodim</p>
         </div>
         <div style={{display:'flex', gap:8}}>
           <button className="btn btn-outline" onClick={exportExcel}>📊 Excel eksport</button>
@@ -80,7 +80,6 @@ export default function Teachers() {
         </div>
       </div>
 
-      {/* Filterlar */}
       <div style={{display:'flex', gap:10, marginBottom:20, flexWrap:'wrap'}}>
         <div className="search-bar" style={{flex:1, minWidth:200}}>
           <span>🔍</span>
@@ -104,8 +103,8 @@ export default function Teachers() {
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <div className="icon">👨‍🏫</div>
-            <h3>O'qituvchilar topilmadi</h3>
-            <p>Qidiruv shartlarini o'zgartiring yoki yangi o'qituvchi qo'shing</p>
+            <h3>Xodimlar topilmadi</h3>
+            <p>Qidiruv shartlarini o'zgartiring yoki yangi xodim qo'shing</p>
           </div>
         ) : (
           <div className="table-wrap">
@@ -113,7 +112,7 @@ export default function Teachers() {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>O'qituvchi</th>
+                  <th>Xodim</th>
                   <th>JSHSHIR</th>
                   <th>Pasport</th>
                   <th>Lavozim / Fan</th>
@@ -136,7 +135,7 @@ export default function Teachers() {
                           fontSize:13, flexShrink:0
                         }}>
                           {t.photo
-                            ? <img src={`http://localhost:5000/uploads/${t.photo}`} alt=""
+                            ? <img src={`${API_URL}/uploads/${t.photo}`} alt=""
                                 style={{width:'100%', height:'100%', objectFit:'cover'}}/>
                             : `${t.first_name?.[0] || ''}${t.last_name?.[0] || ''}`
                           }

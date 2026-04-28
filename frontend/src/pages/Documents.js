@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import API_URL from '../config';
 
 export default function Documents() {
   const [data, setData] = useState([]);
@@ -42,7 +43,10 @@ export default function Documents() {
     if (type === 'Buyruq') return '📜';
     if (type === 'Shartnoma') return '🤝';
     if (type === "Tibbiy ma'lumotnoma") return '🏥';
-    if (type === 'ONID') return '🪪';
+    if (type === 'ONID') return '🆔';
+    if (type === 'Mehnat daftarchasi nusxasi') return '📕';
+    if (type === 'Attestatsiya varaqasi') return '📋';
+    if (type === "Malaka oshirish guvohnomasi") return '📈';
     return '📁';
   };
 
@@ -70,7 +74,7 @@ export default function Documents() {
             className="form-control"
             value={filterType}
             onChange={e => setFilterType(e.target.value)}
-            style={{width:200}}
+            style={{width:220}}
           >
             <option value="">Barcha turlar</option>
             {docTypes.map(t => (
@@ -91,49 +95,56 @@ export default function Documents() {
         <div className="card-body" style={{padding:0}}>
           {filtered.map((d, i) => (
             <div key={d.id} style={{
-              display:'flex', justifyContent:'space-between', alignItems:'center',
               padding:'14px 20px',
               borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
               background: i % 2 === 0 ? '#fff' : '#fafbfc'
             }}>
-              <div style={{display:'flex', alignItems:'center', gap:14}}>
-                <div style={{
-                  width:42, height:42, borderRadius:10,
-                  background:'linear-gradient(135deg,#6366f1,#4f46e5)',
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:20, flexShrink:0
-                }}>{typeIcon(d.doc_type)}</div>
-                <div>
-                  <div style={{fontWeight:700, fontSize:15}}>{d.doc_name}</div>
-                  <div style={{fontSize:12, color:'var(--text-muted)', marginTop:2}}>
-                    <span style={{
-                      background:'#e0e7ff', color:'#4338ca',
-                      padding:'2px 8px', borderRadius:20, fontWeight:600, fontSize:11
-                    }}>{d.doc_type}</span>
-                    <span style={{marginLeft:8}}>{new Date(d.upload_date).toLocaleDateString('uz-UZ')}</span>
-                    {d.onid_number && (
-                      <span style={{marginLeft:8, color:'var(--primary)', fontWeight:600}}>
-                        🪪 ONID: {d.onid_number}
-                      </span>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                <div style={{display:'flex', alignItems:'flex-start', gap:14}}>
+                  <div style={{
+                    width:42, height:42, borderRadius:10,
+                    background:'linear-gradient(135deg,#6366f1,#4f46e5)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:20, flexShrink:0
+                  }}>{typeIcon(d.doc_type)}</div>
+                  <div>
+                    <div style={{fontWeight:700, fontSize:15}}>{d.doc_name}</div>
+                    <div style={{fontSize:12, color:'var(--text-muted)', marginTop:2}}>
+                      <span style={{
+                        background:'#e0e7ff', color:'#4338ca',
+                        padding:'2px 8px', borderRadius:20, fontWeight:600, fontSize:11
+                      }}>{d.doc_type}</span>
+                      <span style={{marginLeft:8}}>{new Date(d.upload_date).toLocaleDateString('uz-UZ')}</span>
+                      {d.onid_number && (
+                        <span style={{marginLeft:8, color:'var(--primary)', fontWeight:600}}>
+                          🪪 ONID: {d.onid_number}
+                        </span>
+                      )}
+                    </div>
+                    {d.doc_type === 'ONID' && (d.onid_login || d.onid_password) && (
+                      <div style={{marginTop:4, fontSize:12, color:'#1d4ed8'}}>
+                        {d.onid_login && <span style={{marginRight:12}}>👤 Login: <b>{d.onid_login}</b></span>}
+                        {d.onid_password && <span>🔑 Parol: <b>{d.onid_password}</b></span>}
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-              <div style={{display:'flex', alignItems:'center', gap:12}}>
-                <div style={{textAlign:'right'}}>
-                  <Link to={`/teachers/${d.teacher.id}`} style={{
-                    fontWeight:700, fontSize:13, color:'var(--primary)', textDecoration:'none'
-                  }}>
-                    👤 {d.teacher.last_name} {d.teacher.first_name}
-                  </Link>
-                  <div style={{fontSize:12, color:'var(--text-muted)'}}>{d.teacher.position}</div>
+                <div style={{display:'flex', alignItems:'center', gap:12}}>
+                  <div style={{textAlign:'right'}}>
+                    <Link to={`/teachers/${d.teacher.id}`} style={{
+                      fontWeight:700, fontSize:13, color:'var(--primary)', textDecoration:'none'
+                    }}>
+                      👤 {d.teacher.last_name} {d.teacher.first_name}
+                    </Link>
+                    <div style={{fontSize:12, color:'var(--text-muted)'}}>{d.teacher.position}</div>
+                  </div>
+                  {d.file_path && (
+                    <a href={`${API_URL}/uploads/${d.file_path}`} target="_blank" rel="noreferrer" download
+                      className="btn btn-outline btn-sm">
+                      {d.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish
+                    </a>
+                  )}
                 </div>
-                {d.file_path && (
-                  <a href={`http://localhost:5000/uploads/${d.file_path}`} target="_blank" rel="noreferrer" download
-                    className="btn btn-outline btn-sm">
-                    {d.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish
-                  </a>
-                )}
               </div>
             </div>
           ))}

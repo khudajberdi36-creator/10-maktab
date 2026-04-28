@@ -2,6 +2,29 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import API_URL from '../config';
+
+const DOC_TYPES = [
+  'Pasport nusxasi',
+  'Diplom nusxasi',
+  'Sertifikat',
+  'Buyruq',
+  'Shartnoma',
+  "Tibbiy ma'lumotnoma",
+  'ONID',
+  'Mehnat daftarchasi nusxasi',
+  'Attestatsiya varaqasi',
+  "Malaka oshirish guvohnomasi",
+  "Ta'lim to'g'risidagi guvohnoma",
+  'Kadrlar bo\'yicha anketa',
+  'Avtobiografiya',
+  'Ijtimoiy sug\'urta guvohnomasi',
+  'Pensiya guvohnomasi',
+  'Nogironlik guvohnomasi',
+  'Harbiy xizmat hujjati',
+  'Nikoh guvohnomasi',
+  'Boshqa',
+];
 
 const Row = ({label, value}) => (
   <div style={{display:'flex', padding:'10px 0', borderBottom:'1px solid #f1f5f9'}}>
@@ -16,7 +39,7 @@ export default function TeacherDetail() {
   const [tab, setTab] = useState('shaxsiy');
   const [certForm, setCertForm] = useState({ name:'', issued_by:'', issued_date:'', expire_date:'', certificate_number:'' });
   const [certFile, setCertFile] = useState(null);
-  const [docForm, setDocForm] = useState({ doc_type:'', doc_name:'', onid_number:'' });
+  const [docForm, setDocForm] = useState({ doc_type:'', doc_name:'', onid_number:'', onid_login:'', onid_password:'' });
   const [docFiles, setDocFiles] = useState([]);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -45,10 +68,10 @@ export default function TeacherDetail() {
   const addDoc = async (e) => {
     e.preventDefault();
     const fd = new FormData();
-    Object.entries(docForm).forEach(([k,v]) => fd.append(k, v));
+    Object.entries(docForm).forEach(([k,v]) => { if (v) fd.append(k, v); });
     docFiles.forEach(f => fd.append('file', f));
     await axios.post(`/api/teachers/${id}/documents`, fd, { headers:{'Content-Type':'multipart/form-data'} });
-    setDocForm({ doc_type:'', doc_name:'', onid_number:'' });
+    setDocForm({ doc_type:'', doc_name:'', onid_number:'', onid_login:'', onid_password:'' });
     setDocFiles([]);
     load();
   };
@@ -59,10 +82,9 @@ export default function TeacherDetail() {
     load();
   };
 
-  // Rasmni yuklab olish
   const downloadPhoto = async () => {
     if (!teacher.photo) return;
-    const url = `http://localhost:5000/uploads/${teacher.photo}`;
+    const url = `${API_URL}/uploads/${teacher.photo}`;
     const res = await fetch(url);
     const blob = await res.blob();
     const a = document.createElement('a');
@@ -71,7 +93,6 @@ export default function TeacherDetail() {
     a.click();
   };
 
-  // Chop etish
   const handlePrint = () => {
     const content = `
       <html><head><title>${teacher.last_name} ${teacher.first_name}</title>
@@ -156,7 +177,7 @@ export default function TeacherDetail() {
         <div style={{position:'relative'}}>
           <div className="detail-avatar">
             {teacher.photo
-              ? <img src={`http://localhost:5000/uploads/${teacher.photo}`} alt="foto"/>
+              ? <img src={`${API_URL}/uploads/${teacher.photo}`} alt="foto"/>
               : `${teacher.first_name?.[0] || ''}${teacher.last_name?.[0] || ''}`
             }
           </div>
@@ -208,7 +229,6 @@ export default function TeacherDetail() {
       <div className="card">
         <div className="card-body">
 
-          {/* SHAXSIY */}
           {tab === 'shaxsiy' && (
             <div>
               <Row label="Familiya" value={teacher.last_name}/>
@@ -223,7 +243,6 @@ export default function TeacherDetail() {
             </div>
           )}
 
-          {/* PASPORT */}
           {tab === 'pasport' && (
             <div>
               <Row label="Pasport seriyasi va raqami" value={`${teacher.passport_series || ''} ${teacher.passport_number || ''}`}/>
@@ -234,7 +253,6 @@ export default function TeacherDetail() {
             </div>
           )}
 
-          {/* ISH */}
           {tab === 'ish' && (
             <div>
               <Row label="Lavozimi" value={teacher.position}/>
@@ -253,7 +271,6 @@ export default function TeacherDetail() {
             </div>
           )}
 
-          {/* TA'LIM */}
           {tab === "ta'lim" && (
             <div>
               <Row label="Ta'lim darajasi" value={teacher.education_level}/>
@@ -265,7 +282,6 @@ export default function TeacherDetail() {
             </div>
           )}
 
-          {/* SERTIFIKATLAR */}
           {tab === 'sertifikat' && (
             <div>
               {teacher.certificates?.length === 0 && (
@@ -288,7 +304,7 @@ export default function TeacherDetail() {
                   </div>
                   <div style={{display:'flex', gap:8}}>
                     {c.file_path && (
-                      <a href={`http://localhost:5000/uploads/${c.file_path}`} target="_blank" rel="noreferrer" download
+                      <a href={`${API_URL}/uploads/${c.file_path}`} target="_blank" rel="noreferrer" download
                         className="btn btn-outline btn-sm">
                         {c.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish
                       </a>
@@ -317,7 +333,6 @@ export default function TeacherDetail() {
             </div>
           )}
 
-          {/* HUJJATLAR */}
           {tab === 'hujjat' && (
             <div>
               {teacher.documents?.length === 0 && (
@@ -328,30 +343,39 @@ export default function TeacherDetail() {
               )}
               {teacher.documents?.map(d => (
                 <div key={d.id} style={{
-                  display:'flex', justifyContent:'space-between', alignItems:'center',
                   padding:'14px 16px', background:'#f8fafc', borderRadius:8, marginBottom:8, border:'1px solid var(--border)'
                 }}>
-                  <div>
-                    <div style={{fontWeight:700}}>{d.doc_name}</div>
-                    <div style={{fontSize:12, color:'var(--text-muted)'}}>
-                      {d.doc_type} • {new Date(d.upload_date).toLocaleDateString('uz-UZ')}
-                      {d.onid_number && (
-                        <span style={{marginLeft:8, color:'var(--primary)', fontWeight:600}}>
-                          🪪 ONID: {d.onid_number}
-                        </span>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                    <div>
+                      <div style={{fontWeight:700}}>{d.doc_name}</div>
+                      <div style={{fontSize:12, color:'var(--text-muted)', marginTop:4}}>
+                        <span style={{background:'#e0e7ff', color:'#4338ca', padding:'2px 8px', borderRadius:20, fontWeight:600, fontSize:11}}>{d.doc_type}</span>
+                        <span style={{marginLeft:8}}>{new Date(d.upload_date).toLocaleDateString('uz-UZ')}</span>
+                        {d.onid_number && (
+                          <span style={{marginLeft:8, color:'var(--primary)', fontWeight:600}}>
+                            🪪 ONID: {d.onid_number}
+                          </span>
+                        )}
+                      </div>
+                      {/* ONID login/parol */}
+                      {d.doc_type === 'ONID' && (d.onid_login || d.onid_password) && (
+                        <div style={{marginTop:6, padding:'6px 10px', background:'#eff6ff', borderRadius:6, fontSize:12}}>
+                          {d.onid_login && <span style={{marginRight:12}}>👤 Login: <b>{d.onid_login}</b></span>}
+                          {d.onid_password && <span>🔑 Parol: <b>{d.onid_password}</b></span>}
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div style={{display:'flex', gap:8}}>
-                    {d.file_path && (
-                      <a href={`http://localhost:5000/uploads/${d.file_path}`} target="_blank" rel="noreferrer" download
-                        className="btn btn-outline btn-sm">
-                        {d.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish
-                      </a>
-                    )}
-                    {canEdit && (
-                      <button className="btn btn-sm" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={() => deleteDoc(d.id)}>🗑</button>
-                    )}
+                    <div style={{display:'flex', gap:8}}>
+                      {d.file_path && (
+                        <a href={`${API_URL}/uploads/${d.file_path}`} target="_blank" rel="noreferrer" download
+                          className="btn btn-outline btn-sm">
+                          {d.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish
+                        </a>
+                      )}
+                      {canEdit && (
+                        <button className="btn btn-sm" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={() => deleteDoc(d.id)}>🗑</button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -364,30 +388,33 @@ export default function TeacherDetail() {
                       <label className="form-label">Hujjat turi *</label>
                       <select className="form-control" required value={docForm.doc_type} onChange={e=>setDocForm({...docForm, doc_type:e.target.value})}>
                         <option value="">Tanlang</option>
-                        <option value="Pasport nusxasi">Pasport nusxasi</option>
-                        <option value="Diplom nusxasi">Diplom nusxasi</option>
-                        <option value="Sertifikat">Sertifikat</option>
-                        <option value="Buyruq">Buyruq</option>
-                        <option value="Shartnoma">Shartnoma</option>
-                        <option value="Tibbiy ma'lumotnoma">Tibbiy ma'lumotnoma</option>
-                        <option value="ONID">ONID</option>
-                        <option value="Boshqa">Boshqa</option>
+                        {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label">Nomi *</label>
                       <input className="form-control" required value={docForm.doc_name} onChange={e=>setDocForm({...docForm, doc_name:e.target.value})}/>
                     </div>
-                    {docForm.doc_type === 'ONID' && (
+                    {docForm.doc_type === 'ONID' && (<>
                       <div className="form-group">
                         <label className="form-label">ONID raqami</label>
                         <input className="form-control" placeholder="ONID raqamini kiriting"
                           value={docForm.onid_number} onChange={e=>setDocForm({...docForm, onid_number:e.target.value})}/>
                       </div>
-                    )}
+                      <div className="form-group">
+                        <label className="form-label">ONID Login</label>
+                        <input className="form-control" placeholder="Login (username)"
+                          value={docForm.onid_login} onChange={e=>setDocForm({...docForm, onid_login:e.target.value})}/>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">ONID Parol</label>
+                        <input className="form-control" placeholder="Parol"
+                          value={docForm.onid_password} onChange={e=>setDocForm({...docForm, onid_password:e.target.value})}/>
+                      </div>
+                    </>)}
                     <div className="form-group">
-                      <label className="form-label">Fayllar (PDF yoki rasm, ko'p yuklash mumkin)</label>
-                      <input type="file" className="form-control" multiple accept=".pdf,.jpg,.jpeg,.png"
+                      <label className="form-label">Fayllar (PDF yoki rasm)</label>
+                      <input type="file" className="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                         onChange={e => setDocFiles(Array.from(e.target.files))}/>
                       {docFiles.length > 0 && (
                         <div style={{fontSize:12, color:'var(--text-muted)', marginTop:4}}>

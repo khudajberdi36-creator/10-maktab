@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import API_URL from '../config';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -19,14 +20,14 @@ export default function Dashboard() {
           <div className="stat-icon" style={{background:'#dbeafe'}}>👨‍🏫</div>
           <div>
             <div className="stat-num">{stats.total}</div>
-            <div className="stat-label">Jami o'qituvchilar</div>
+            <div className="stat-label">Jami xodimlar</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon" style={{background:'#dcfce7'}}>✅</div>
           <div>
             <div className="stat-num" style={{color:'var(--success)'}}>{stats.active}</div>
-            <div className="stat-label">Faol o'qituvchilar</div>
+            <div className="stat-label">Faol xodimlar</div>
           </div>
         </div>
         <div className="stat-card">
@@ -75,7 +76,7 @@ export default function Dashboard() {
                   justifyContent:'center', fontWeight:800, fontSize:15, flexShrink:0
                 }}>
                   {t.photo
-                    ? <img src={`http://localhost:5000/uploads/${t.photo}`} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    ? <img src={`${API_URL}/uploads/${t.photo}`} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                     : `${t.first_name?.[0]}${t.last_name?.[0]}`
                   }
                 </div>
@@ -150,7 +151,7 @@ export default function Dashboard() {
                   justifyContent:'center', color:'#fff', fontWeight:800, fontSize:13, flexShrink:0
                 }}>
                   {t.photo
-                    ? <img src={`http://localhost:5000/uploads/${t.photo}`} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    ? <img src={`${API_URL}/uploads/${t.photo}`} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                     : `${t.first_name?.[0]}${t.last_name?.[0]}`
                   }
                 </div>
@@ -213,7 +214,7 @@ export default function Dashboard() {
           <div className="card-header"><span className="card-title">⚡ Tezkor amallar</span></div>
           <div className="card-body">
             <div style={{display:'flex', flexDirection:'column', gap:10}}>
-              <Link to="/teachers/new" className="btn btn-primary">➕ Yangi o'qituvchi qo'shish</Link>
+              <Link to="/teachers/new" className="btn btn-primary">➕ Yangi xodim qo'shish</Link>
               <Link to="/import" className="btn btn-accent">📥 Excel dan import qilish</Link>
               <Link to="/teachers" className="btn btn-outline">📋 Barcha ro'yxatni ko'rish</Link>
               <Link to="/certificates" className="btn btn-outline">🏆 Sertifikatlarni ko'rish</Link>

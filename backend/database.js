@@ -1,8 +1,18 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
 
-const db = new sqlite3.Database(path.join(__dirname, 'teachers.db'));
+// Ma'lumotlar doimiy saqlanishi uchun /opt/render/project/data papkasidan foydalanamiz
+// Render.com da bu disk persistent bo'ladi (agar Disk qo'shilgan bo'lsa)
+// Aks holda loyiha papkasida saqlanadi
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname);
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+const DB_PATH = path.join(DATA_DIR, 'teachers.db');
+const db = new sqlite3.Database(DB_PATH);
 
 db.run_p = (sql, params = []) => new Promise((res, rej) =>
   db.run(sql, params, function (err) { err ? rej(err) : res(this); })
@@ -57,9 +67,19 @@ async function init() {
     teacher_id INTEGER NOT NULL, doc_type TEXT NOT NULL,
     doc_name TEXT NOT NULL, file_path TEXT,
     onid_number TEXT,
+    onid_login TEXT,
+    onid_password TEXT,
     upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
   )`);
+
+  // Eski documents jadvaliga yangi ustunlar qo'shish (agar yo'q bo'lsa)
+  try {
+    await db.run_p(`ALTER TABLE documents ADD COLUMN onid_login TEXT`);
+  } catch(e) { /* ustun allaqachon bor */ }
+  try {
+    await db.run_p(`ALTER TABLE documents ADD COLUMN onid_password TEXT`);
+  } catch(e) { /* ustun allaqachon bor */ }
 
   const admin = await db.get_p('SELECT id FROM users WHERE username = ?', ['admin']);
   if (!admin) {
@@ -76,27 +96,15 @@ async function init() {
       experience_years,labor_book_number,labor_book_date,previous_workplaces,education_level,
       university,specialty,graduation_year,diploma_number,diploma_date,status) VALUES
       (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      ['Dilnoza','Yusupova','Karimovna','1985-03-15','Ayol','AA','1234567','Toshkent IIB',
+      ['Dilnoza','Yusupova','Karimovna','15/03/1985','Ayol','AA','1234567','Toshkent IIB',
        '2018-01-10','2028-01-10','28503150001234','+998901234567','dilnoza@maktab.uz',
        "Toshkent sh., Yunusobod t.","Matematika o'qituvchisi",'Matematika',
        '2010-09-01','Asosiy',1.0,14,'TR-001234','2010-09-01','2005-2010: 45-maktab',
        'Oliy','NUUz','Matematika','2005','D-2005-1234','2005-06-15','active']);
 
-    await db.run_p(`INSERT INTO teachers (first_name,last_name,middle_name,birth_date,gender,
-      passport_series,passport_number,passport_issued_by,passport_issued_date,passport_expire_date,
-      jshshir,phone,email,address,position,subject,employment_date,employment_type,salary_rate,
-      experience_years,labor_book_number,labor_book_date,previous_workplaces,education_level,
-      university,specialty,graduation_year,diploma_number,diploma_date,status) VALUES
-      (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      ['Bobur','Rahimov','Aliyevich','1978-07-22','Erkak','AB','7654321','Samarqand IIB',
-       '2019-05-20','2029-05-20','22507780002345','+998912345678','bobur@maktab.uz',
-       "Samarqand sh., Registon t.","Fizika o'qituvchisi",'Fizika',
-       '2005-09-01','Asosiy',1.25,19,'TR-005678','2005-09-01','2002-2005: 12-maktab',
-       'Oliy','SamDU','Fizika','2001','D-2001-5678','2001-06-20','active']);
-
     console.log("Demo ma'lumotlar yuklandi");
   }
-  console.log("Ma'lumotlar bazasi tayyor");
+  console.log("Ma'lumotlar bazasi tayyor:", DB_PATH);
 }
 
 init().catch(console.error);
