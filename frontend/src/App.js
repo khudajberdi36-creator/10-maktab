@@ -9,12 +9,20 @@ import TeacherDetail from './pages/TeacherDetail';
 import Certificates from './pages/Certificates';
 import Documents from './pages/Documents';
 import Import from './pages/Import';
+import Users from './pages/Users';
 import Layout from './components/Layout';
 import './App.css';
 
 const Protected = ({ children }) => {
   const { user } = useAuth();
   return user ? children : <Navigate to="/login" />;
+};
+
+const AdminOnly = ({ children }) => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin') return <Navigate to="/" />;
+  return children;
 };
 
 export default function App() {
@@ -32,6 +40,7 @@ export default function App() {
             <Route path="certificates" element={<Certificates />} />
             <Route path="documents" element={<Documents />} />
             <Route path="import" element={<Import />} />
+            <Route path="users" element={<AdminOnly><Users /></AdminOnly>} />
           </Route>
         </Routes>
       </BrowserRouter>

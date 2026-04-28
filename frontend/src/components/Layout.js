@@ -17,6 +17,7 @@ export default function Layout() {
     if (location.pathname === '/certificates') return "Sertifikatlar";
     if (location.pathname === '/documents') return "Hujjatlar";
     if (location.pathname === '/import') return "Excel/CSV Import";
+    if (location.pathname === '/users') return "Foydalanuvchilar";
     return "Tizim";
   };
 
@@ -60,6 +61,15 @@ export default function Layout() {
               <span className="icon">📁</span> Hujjatlar
             </NavLink>
           </div>
+
+          {user?.role === 'admin' && (
+            <div className="nav-section">
+              <div className="nav-section-title">Tizim</div>
+              <NavLink to="/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <span className="icon">👥</span> Foydalanuvchilar
+              </NavLink>
+            </div>
+          )}
         </nav>
 
         <div className="sidebar-user">
