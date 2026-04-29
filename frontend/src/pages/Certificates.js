@@ -8,16 +8,22 @@ export default function Certificates() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/api/teachers').then(async r => {
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    axios.get('/api/teachers', { headers }).then(async r => {
       const teachers = r.data;
       const all = [];
       for (const t of teachers) {
-        const detail = await axios.get(`/api/teachers/${t.id}`);
+        const detail = await axios.get(`/api/teachers/${t.id}`, { headers });
         (detail.data.certificates || []).forEach(c => {
           all.push({ ...c, teacher: detail.data });
         });
       }
       setData(all);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Xato:', err);
       setLoading(false);
     });
   }, []);
@@ -97,7 +103,8 @@ export default function Certificates() {
                   <div style={{fontSize:12, color:'var(--text-muted)'}}>{c.teacher.position}</div>
                 </div>
                 {c.file_path && (
-                  <a href={`http://localhost:5000/uploads/${c.file_path}`} target="_blank" rel="noreferrer" download
+                  <a href={`https://one0-maktab-tt.onrender.com/uploads/${c.file_path}`}
+                    target="_blank" rel="noreferrer" download
                     className="btn btn-outline btn-sm">
                     {c.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish
                   </a>
