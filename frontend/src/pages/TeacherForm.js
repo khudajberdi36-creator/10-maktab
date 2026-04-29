@@ -17,7 +17,7 @@ const SUBJECTS = [
   'Matematika','Fizika','Kimyo','Biologiya','Tarix','Geografiya',
   'Adabiyot','Ona tili','Ingliz tili','Rus tili','Informatika',
   'Chizmachilik','Jismoniy tarbiya','Musiqa',"Tasviriy san'at",
-  "Mehnat ta'limi",'Qoraqalpoq tili','Nemis tili','Turkman tili',
+  "Mehnat ta'limi","Boshlang'ich ta'lim",'Qoraqalpoq tili','Nemis tili','Turkman tili',
   'Fransuz tili','Boshqa'
 ];
 
