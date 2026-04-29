@@ -17,7 +17,8 @@ const SUBJECTS = [
   'Matematika','Fizika','Kimyo','Biologiya','Tarix','Geografiya',
   'Adabiyot','Ona tili','Ingliz tili','Rus tili','Informatika',
   'Chizmachilik','Jismoniy tarbiya','Musiqa',"Tasviriy san'at",
-  "Mehnat ta'limi",'Boshqa'
+  "Mehnat ta'limi",'Qoraqalpoq tili','Nemis tili','Turkman tili',
+  'Fransuz tili','Boshqa'
 ];
 
 const POSITIONS = [
@@ -65,6 +66,7 @@ export default function TeacherForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [customSubject, setCustomSubject] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
@@ -75,6 +77,10 @@ export default function TeacherForm() {
         const d = r.data;
         setForm({...EMPTY, ...d});
         if (d.photo) setPhotoPreview(`${API_URL}/uploads/${d.photo}`);
+        // Agar saqlangan fan ro'yxatda yo'q bo'lsa, "Boshqa" rejimini yoqamiz
+        if (d.subject && !SUBJECTS.slice(0, -1).includes(d.subject)) {
+          setCustomSubject(true);
+        }
       });
     }
   }, [id]);
@@ -86,6 +92,17 @@ export default function TeacherForm() {
     if (!file) return;
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSubjectChange = (e) => {
+    const val = e.target.value;
+    if (val === 'Boshqa') {
+      setCustomSubject(true);
+      set('subject', '');
+    } else {
+      setCustomSubject(false);
+      set('subject', val);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -130,7 +147,7 @@ export default function TeacherForm() {
                 {photoPreview ? <img src={photoPreview} alt="foto" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : '📷'}
               </div>
               <label className="btn btn-outline btn-sm" style={{cursor:'pointer'}}>
-                📤 Foto yuklash
+                📂 Foto yuklash
                 <input type="file" accept="image/*" style={{display:'none'}} onChange={handlePhoto}/>
               </label>
             </div>
@@ -191,10 +208,23 @@ export default function TeacherForm() {
               </select>
             </F>
             <F label="Fan">
-              <select className="form-control" value={form.subject} onChange={e=>set('subject',e.target.value)}>
+              <select
+                className="form-control"
+                value={customSubject ? 'Boshqa' : form.subject}
+                onChange={handleSubjectChange}
+              >
                 <option value="">Tanlang</option>
                 {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+              {customSubject && (
+                <input
+                  className="form-control"
+                  style={{marginTop: 8}}
+                  placeholder="Fan nomini yozing..."
+                  value={form.subject}
+                  onChange={e => set('subject', e.target.value)}
+                />
+              )}
             </F>
             <F label="Sinf rahbari (sinf nomi)"><input className="form-control" placeholder="Masalan: 9-A" value={form.class_teacher} onChange={e=>set('class_teacher',e.target.value)}/></F>
             <F label="Ishga kirgan sana"><input type="date" className="form-control" value={form.employment_date} onChange={e=>set('employment_date',e.target.value)}/></F>
@@ -220,7 +250,7 @@ export default function TeacherForm() {
             <F label="Ish staji (yil)"><input type="number" className="form-control" min="0" max="50" value={form.experience_years} onChange={e=>set('experience_years',e.target.value)}/></F>
           </div>
           <div style={{marginTop:16, padding:16, background:'#f8fafc', borderRadius:8}}>
-            <div style={{fontWeight:700, marginBottom:12, fontSize:13, color:'var(--text-muted)'}}>📕 Mehnat daftarchasi</div>
+            <div style={{fontWeight:700, marginBottom:12, fontSize:13, color:'var(--text-muted)'}}>📋 Mehnat daftarchasi</div>
             <div className="form-grid form-grid-3">
               <F label="Daftarcha raqami"><input className="form-control" value={form.labor_book_number} onChange={e=>set('labor_book_number',e.target.value)}/></F>
               <F label="Berilgan sana"><input type="date" className="form-control" value={form.labor_book_date} onChange={e=>set('labor_book_date',e.target.value)}/></F>
