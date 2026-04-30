@@ -12,6 +12,10 @@ export const AuthProvider = ({ children }) => {
     return u ? JSON.parse(u) : null;
   });
 
+  const [adminVerified, setAdminVerified] = useState(() => {
+    return localStorage.getItem('adminVerified') === 'true';
+  });
+
   const login = async (username, password) => {
     const res = await axios.post('/api/auth/login', { username, password });
     localStorage.setItem('token', res.data.token);
@@ -24,14 +28,20 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('adminVerified');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
+    setAdminVerified(false);
   };
 
   const token = localStorage.getItem('token');
   if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, logout, adminVerified }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);

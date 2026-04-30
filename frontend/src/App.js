@@ -19,9 +19,10 @@ const Protected = ({ children }) => {
 };
 
 const AdminOnly = ({ children }) => {
-  const { user } = useAuth();
+  const { user, adminVerified } = useAuth();
   if (!user) return <Navigate to="/login" />;
-  if (user.role !== 'admin') return <Navigate to="/" />;
+  if (!adminVerified) return <Navigate to="/login?admin" />;
+  if (user.role !== 'admin' && user.role !== 'direktor') return <Navigate to="/" />;
   return children;
 };
 
@@ -34,12 +35,12 @@ export default function App() {
           <Route path="/" element={<Protected><Layout /></Protected>}>
             <Route index element={<Dashboard />} />
             <Route path="teachers" element={<Teachers />} />
-            <Route path="teachers/new" element={<TeacherForm />} />
+            <Route path="teachers/new" element={<AdminOnly><TeacherForm /></AdminOnly>} />
             <Route path="teachers/:id" element={<TeacherDetail />} />
-            <Route path="teachers/:id/edit" element={<TeacherForm />} />
+            <Route path="teachers/:id/edit" element={<AdminOnly><TeacherForm /></AdminOnly>} />
             <Route path="certificates" element={<Certificates />} />
             <Route path="documents" element={<Documents />} />
-            <Route path="import" element={<Import />} />
+            <Route path="import" element={<AdminOnly><Import /></AdminOnly>} />
             <Route path="users" element={<AdminOnly><Users /></AdminOnly>} />
           </Route>
         </Routes>
