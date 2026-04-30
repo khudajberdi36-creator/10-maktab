@@ -10,18 +10,18 @@ export default function Documents() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/api/teachers').then(async r => {
-      const teachers = r.data;
-      const all = [];
-      for (const t of teachers) {
-        const detail = await axios.get(`/api/teachers/${t.id}`);
-        (detail.data.documents || []).forEach(d => {
-          all.push({ ...d, teacher: detail.data });
-        });
-      }
-      setData(all);
-      setLoading(false);
-    });
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    axios.get('/api/teachers/documents/all', { headers })
+      .then(r => {
+        setData(r.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Xato:', err);
+        setLoading(false);
+      });
   }, []);
 
   const docTypes = [...new Set(data.map(d => d.doc_type))].filter(Boolean);
@@ -29,8 +29,8 @@ export default function Documents() {
   const filtered = data.filter(d => {
     const matchSearch =
       d.doc_name?.toLowerCase().includes(search.toLowerCase()) ||
-      d.teacher?.last_name?.toLowerCase().includes(search.toLowerCase()) ||
-      d.teacher?.first_name?.toLowerCase().includes(search.toLowerCase()) ||
+      d.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+      d.first_name?.toLowerCase().includes(search.toLowerCase()) ||
       d.onid_number?.toLowerCase().includes(search.toLowerCase());
     const matchType = filterType ? d.doc_type === filterType : true;
     return matchSearch && matchType;
@@ -114,7 +114,9 @@ export default function Documents() {
                         background:'#e0e7ff', color:'#4338ca',
                         padding:'2px 8px', borderRadius:20, fontWeight:600, fontSize:11
                       }}>{d.doc_type}</span>
-                      <span style={{marginLeft:8}}>{new Date(d.upload_date).toLocaleDateString('uz-UZ')}</span>
+                      <span style={{marginLeft:8}}>
+                        {d.upload_date ? new Date(d.upload_date).toLocaleDateString('uz-UZ') : ''}
+                      </span>
                       {d.onid_number && (
                         <span style={{marginLeft:8, color:'var(--primary)', fontWeight:600}}>
                           🪪 ONID: {d.onid_number}
@@ -131,12 +133,12 @@ export default function Documents() {
                 </div>
                 <div style={{display:'flex', alignItems:'center', gap:12}}>
                   <div style={{textAlign:'right'}}>
-                    <Link to={`/teachers/${d.teacher.id}`} style={{
+                    <Link to={`/teachers/${d.teacher_id}`} style={{
                       fontWeight:700, fontSize:13, color:'var(--primary)', textDecoration:'none'
                     }}>
-                      👤 {d.teacher.last_name} {d.teacher.first_name}
+                      👤 {d.last_name} {d.first_name}
                     </Link>
-                    <div style={{fontSize:12, color:'var(--text-muted)'}}>{d.teacher.position}</div>
+                    <div style={{fontSize:12, color:'var(--text-muted)'}}>{d.position}</div>
                   </div>
                   {d.file_path && (
                     <a href={`${API_URL}/uploads/${d.file_path}`} target="_blank" rel="noreferrer" download
