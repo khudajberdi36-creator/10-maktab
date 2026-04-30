@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://one0-maktab-tt.onrender.com/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://one0-maktab-tt.onrender.com/uploads/:path*"
+    }
+  ]
+}
