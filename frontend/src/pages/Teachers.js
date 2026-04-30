@@ -16,13 +16,24 @@ export default function Teachers() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const getHeaders = () => {
+    const token = localStorage.getItem('token');
+    return { Authorization: `Bearer ${token}` };
+  };
+
   const load = () => {
     setLoading(true);
     const params = {};
     if (search) params.search = search;
     if (status) params.status = status;
-    axios.get('/api/teachers', { params }).then(r => {
+    axios.get('/api/teachers', { 
+      params,
+      headers: getHeaders()
+    }).then(r => {
       setTeachers(r.data);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Xato:', err);
       setLoading(false);
     });
   };
@@ -31,7 +42,7 @@ export default function Teachers() {
 
   const deleteTeacher = async (id, name) => {
     if (!window.confirm(`"${name}" o'qituvchini o'chirmoqchimisiz?`)) return;
-    await axios.delete(`/api/teachers/${id}`);
+    await axios.delete(`/api/teachers/${id}`, { headers: getHeaders() });
     load();
   };
 
@@ -62,10 +73,7 @@ export default function Teachers() {
   };
 
   const canEdit = user?.role === 'admin' || user?.role === 'direktor';
-
-  const filtered = teachers.filter(t =>
-    subject ? t.subject === subject : true
-  );
+  const filtered = teachers.filter(t => subject ? t.subject === subject : true);
 
   return (
     <div>

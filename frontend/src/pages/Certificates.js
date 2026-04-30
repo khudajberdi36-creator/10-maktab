@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import API_URL from '../config';
 
 export default function Certificates() {
   const [data, setData] = useState([]);
@@ -11,27 +12,21 @@ export default function Certificates() {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
 
-    axios.get('/api/teachers', { headers }).then(async r => {
-      const teachers = r.data;
-      const all = [];
-      for (const t of teachers) {
-        const detail = await axios.get(`/api/teachers/${t.id}`, { headers });
-        (detail.data.certificates || []).forEach(c => {
-          all.push({ ...c, teacher: detail.data });
-        });
-      }
-      setData(all);
-      setLoading(false);
-    }).catch(err => {
-      console.error('Xato:', err);
-      setLoading(false);
-    });
+    axios.get('/api/teachers/certificates/all', { headers })
+      .then(r => {
+        setData(r.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Xato:', err);
+        setLoading(false);
+      });
   }, []);
 
   const filtered = data.filter(c =>
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.teacher?.last_name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.teacher?.first_name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.first_name?.toLowerCase().includes(search.toLowerCase()) ||
     c.certificate_number?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -95,15 +90,15 @@ export default function Certificates() {
               </div>
               <div style={{display:'flex', alignItems:'center', gap:12}}>
                 <div style={{textAlign:'right'}}>
-                  <Link to={`/teachers/${c.teacher.id}`} style={{
+                  <Link to={`/teachers/${c.teacher_id}`} style={{
                     fontWeight:700, fontSize:13, color:'var(--primary)', textDecoration:'none'
                   }}>
-                    👤 {c.teacher.last_name} {c.teacher.first_name}
+                    👤 {c.last_name} {c.first_name}
                   </Link>
-                  <div style={{fontSize:12, color:'var(--text-muted)'}}>{c.teacher.position}</div>
+                  <div style={{fontSize:12, color:'var(--text-muted)'}}>{c.position}</div>
                 </div>
                 {c.file_path && (
-                  <a href={`https://one0-maktab-tt.onrender.com/uploads/${c.file_path}`}
+                  <a href={`${API_URL}/uploads/${c.file_path}`}
                     target="_blank" rel="noreferrer" download
                     className="btn btn-outline btn-sm">
                     {c.file_path.endsWith('.pdf') ? '📄' : '🖼️'} Yuklab olish

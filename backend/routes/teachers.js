@@ -28,12 +28,20 @@ const FIELDS = [
   'diploma_number','diploma_date','status','notes'
 ];
 
-// PostgreSQL uchun ? ni $1,$2... ga aylantirish
-function toPgParams(sql, params) {
-  let i = 0;
-  const pgSql = sql.replace(/\?/g, () => `$${++i}`);
-  return { pgSql, params };
-}
+// GET all certificates (barcha o'qituvchilarning sertifikatlari)
+router.get('/certificates/all', auth, async (req, res) => {
+  try {
+    const certs = await db.all_p(`
+      SELECT c.*, t.first_name, t.last_name, t.position, t.id as teacher_id
+      FROM certificates c
+      JOIN teachers t ON c.teacher_id = t.id
+      ORDER BY c.issued_date DESC
+    `, []);
+    res.json(certs);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
 
 // GET all teachers
 router.get('/', auth, async (req, res) => {
