@@ -7,7 +7,6 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database');
 const auth = require('../middleware/auth');
 
-// Uploads papkasi
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -28,7 +27,22 @@ const FIELDS = [
   'diploma_number','diploma_date','status','notes'
 ];
 
-// GET all certificates (barcha o'qituvchilarning sertifikatlari)
+// GET all documents ✅ YANGI
+router.get('/documents/all', auth, async (req, res) => {
+  try {
+    const docs = await db.all_p(`
+      SELECT d.*, t.first_name, t.last_name, t.position, t.id as teacher_id
+      FROM documents d
+      JOIN teachers t ON d.teacher_id = t.id
+      ORDER BY d.upload_date DESC
+    `, []);
+    res.json(docs);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// GET all certificates
 router.get('/certificates/all', auth, async (req, res) => {
   try {
     const certs = await db.all_p(`
