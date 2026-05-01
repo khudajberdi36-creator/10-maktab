@@ -1,5 +1,5 @@
-import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const roleLabels = { admin: 'Administrator', direktor: 'Direktor', oquvchi: "O'qituvchi" };
@@ -7,17 +7,58 @@ const roleLabels = { admin: 'Administrator', direktor: 'Direktor', oquvchi: "O'q
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const mainRef = useRef(null);
+
+  // ─── Token muddatini tekshirish ───────────────────────────────────────────
+  useEffect(() => {
+    const checkToken = () => {
+      const token = localStorage.getItem('token');
+      if (!token) { logout(); navigate('/login'); return; }
+
+      try {
+        // JWT payload ni decode qilish (verify emas, faqat muddatni ko'rish)
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = Math.floor(Date.now() / 1000);
+
+        if (payload.exp && payload.exp < now) {
+          // Token muddati tugagan
+          logout();
+          navigate('/login');
+        }
+      } catch {
+        logout();
+        navigate('/login');
+      }
+    };
+
+    // Sahifa ochilganda tekshir
+    checkToken();
+
+    // Har 5 daqiqada tekshir
+    const interval = setInterval(checkToken, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ─── Sahifalar orasida o'tish animatsiyasi ────────────────────────────────
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.style.animation = 'none';
+      void mainRef.current.offsetHeight; // reflow
+      mainRef.current.style.animation = 'fadeInUp 0.35s cubic-bezier(0.22,1,0.36,1) both';
+    }
+  }, [location.pathname]);
 
   const getTitle = () => {
-    if (location.pathname === '/') return 'Bosh sahifa';
-    if (location.pathname.includes('/teachers/new')) return "Yangi o'qituvchi";
-    if (location.pathname.includes('/edit')) return "Tahrirlash";
-    if (location.pathname.includes('/teachers/')) return "O'qituvchi ma'lumotlari";
-    if (location.pathname === '/teachers') return "O'qituvchilar ro'yxati";
-    if (location.pathname === '/certificates') return "Sertifikatlar";
-    if (location.pathname === '/documents') return "Hujjatlar";
-    if (location.pathname === '/import') return "Excel/CSV Import";
-    if (location.pathname === '/users') return "Foydalanuvchilar";
+    if (location.pathname === '/') return '📊 Bosh sahifa';
+    if (location.pathname.includes('/teachers/new')) return "➕ Yangi o'qituvchi";
+    if (location.pathname.includes('/edit')) return "✏️ Tahrirlash";
+    if (location.pathname.includes('/teachers/')) return "👤 O'qituvchi ma'lumotlari";
+    if (location.pathname === '/teachers') return "👨‍🏫 O'qituvchilar ro'yxati";
+    if (location.pathname === '/certificates') return "🏆 Sertifikatlar";
+    if (location.pathname === '/documents') return "📁 Hujjatlar";
+    if (location.pathname === '/import') return "📥 Excel/CSV Import";
+    if (location.pathname === '/users') return "👥 Foydalanuvchilar";
     return "Tizim";
   };
 
@@ -80,7 +121,9 @@ export default function Layout() {
               <div className="sidebar-user-role">{roleLabels[user?.role]}</div>
             </div>
           </div>
-          <button className="logout-btn" onClick={logout}>🚪 Chiqish</button>
+          <button className="logout-btn" onClick={() => { logout(); navigate('/login'); }}>
+            🚪 Chiqish
+          </button>
         </div>
       </aside>
 
@@ -88,12 +131,12 @@ export default function Layout() {
         <header className="topbar">
           <h1 className="topbar-title">{getTitle()}</h1>
           <div className="topbar-right">
-            <span style={{fontSize:13, color:'var(--text-muted)', fontWeight:600}}>
-              {new Date().toLocaleDateString('uz-UZ', { year:'numeric', month:'long', day:'numeric' })}
+            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
+              {new Date().toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
           </div>
         </header>
-        <main className="page">
+        <main className="page" ref={mainRef}>
           <Outlet />
         </main>
       </div>

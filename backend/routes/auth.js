@@ -7,7 +7,62 @@ const db = require('../database');
 const SECRET = process.env.JWT_SECRET || 'maktab_tizim_secret_2024';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'maktab_admin_2024';
 
-// Login logs jadvalini yaratish
+// ─── Brute Force himoya (xotirada saqlanadi) ──────────────────────────────
+// { ip: { count: 0, lastAttempt: Date, blockedUntil: Date } }
+const loginAttempts = {};
+
+const MAX_ATTEMPTS = 5;          // maksimal urinish
+const BLOCK_DURATION = 15 * 60 * 1000; // 15 daqiqa blok
+const WINDOW_DURATION = 10 * 60 * 1000; // 10 daqiqa ichida
+
+function getAttemptInfo(ip) {
+  if (!loginAttempts[ip]) {
+    loginAttempts[ip] = { count: 0, lastAttempt: null, blockedUntil: null };
+  }
+  return loginAttempts[ip];
+}
+
+function isBlocked(ip) {
+  const info = getAttemptInfo(ip);
+  if (info.blockedUntil && new Date() < new Date(info.blockedUntil)) {
+    return true;
+  }
+  // Blok vaqti o'tgan bo'lsa — tozalash
+  if (info.blockedUntil && new Date() >= new Date(info.blockedUntil)) {
+    loginAttempts[ip] = { count: 0, lastAttempt: null, blockedUntil: null };
+  }
+  return false;
+}
+
+function recordFailedAttempt(ip) {
+  const info = getAttemptInfo(ip);
+  const now = new Date();
+
+  // Oxirgi urinishdan 10 daqiqa o'tgan bo'lsa — reset
+  if (info.lastAttempt && (now - new Date(info.lastAttempt)) > WINDOW_DURATION) {
+    info.count = 0;
+  }
+
+  info.count += 1;
+  info.lastAttempt = now;
+
+  if (info.count >= MAX_ATTEMPTS) {
+    info.blockedUntil = new Date(now.getTime() + BLOCK_DURATION);
+  }
+}
+
+function clearAttempts(ip) {
+  delete loginAttempts[ip];
+}
+
+function getRemainingTime(ip) {
+  const info = getAttemptInfo(ip);
+  if (!info.blockedUntil) return 0;
+  const remaining = new Date(info.blockedUntil) - new Date();
+  return Math.ceil(remaining / 60000); // minutda
+}
+
+// ─── Login logs jadvalini yaratish ────────────────────────────────────────
 db.run_p(`
   CREATE TABLE IF NOT EXISTS login_logs (
     id SERIAL PRIMARY KEY,
@@ -22,35 +77,64 @@ db.run_p(`
   )
 `, []).catch(() => {});
 
-// Ustunlar mavjud bo'lmasa qo'shish
 db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS user_id INTEGER`, []).catch(() => {});
 db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS action VARCHAR(20) DEFAULT 'login'`, []).catch(() => {});
 
-// Login
+// ─── LOGIN ─────────────────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
+
+    // Brute force tekshiruvi
+    if (isBlocked(ip)) {
+      const mins = getRemainingTime(ip);
+      return res.status(429).json({
+        message: `Juda ko'p urinish! ${mins} daqiqadan keyin qaytadan urinib ko'ring.`
+      });
+    }
+
     const user = await db.get_p('SELECT * FROM users WHERE username = $1', [username]);
 
     if (!user) {
+      recordFailedAttempt(ip);
+      const info = getAttemptInfo(ip);
+      const left = MAX_ATTEMPTS - info.count;
+
       await db.run_p(
         'INSERT INTO login_logs (username, action, status, ip) VALUES ($1, $2, $3, $4)',
         [username, 'login', 'failed', ip]
       ).catch(() => {});
-      return res.status(401).json({ message: "Foydalanuvchi topilmadi" });
+
+      return res.status(401).json({
+        message: left > 0
+          ? `Foydalanuvchi topilmadi. ${left} ta urinish qoldi.`
+          : `Bloklandingiz. 15 daqiqadan keyin urinib ko'ring.`
+      });
     }
 
     if (!bcrypt.compareSync(password, user.password)) {
+      recordFailedAttempt(ip);
+      const info = getAttemptInfo(ip);
+      const left = MAX_ATTEMPTS - info.count;
+
       await db.run_p(
-        'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [user.id, username, user.full_name, user.role, 'login', 'failed', ip]
       ).catch(() => {});
-      return res.status(401).json({ message: "Parol noto'g'ri" });
+
+      return res.status(401).json({
+        message: left > 0
+          ? `Parol noto'g'ri. ${left} ta urinish qoldi.`
+          : `Bloklandingiz. 15 daqiqadan keyin urinib ko'ring.`
+      });
     }
 
+    // Muvaffaqiyatli — urinishlarni tozalash
+    clearAttempts(ip);
+
     await db.run_p(
-      'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1,$2,$3,$4,$5,$6,$7)',
       [user.id, username, user.full_name, user.role, 'login', 'success', ip]
     ).catch(() => {});
 
@@ -64,30 +148,31 @@ router.post('/login', async (req, res) => {
       token,
       user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role }
     });
+
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-// Logout
+// ─── LOGOUT ────────────────────────────────────────────────────────────────
 router.post('/logout', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (token) {
       const decoded = jwt.verify(token, SECRET);
-      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
       await db.run_p(
-        'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [decoded.id, decoded.username || '', decoded.full_name, decoded.role, 'logout', 'success', ip]
       ).catch(() => {});
     }
     res.json({ message: 'Chiqildi' });
-  } catch (e) {
+  } catch {
     res.json({ message: 'Chiqildi' });
   }
 });
 
-// Login loglarini olish — faqat admin
+// ─── LOGIN LOGLARINI OLISH — faqat admin ──────────────────────────────────
 router.get('/login-logs', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -96,15 +181,14 @@ router.get('/login-logs', async (req, res) => {
     let decoded;
     try {
       decoded = jwt.verify(token, SECRET);
-    } catch (e) {
-      return res.status(401).json({ message: 'Token yaroqsiz' });
+    } catch {
+      return res.status(401).json({ message: 'Token yaroqsiz yoki muddati tugagan' });
     }
 
     if (decoded.role !== 'admin') {
       return res.status(403).json({ message: 'Faqat admin kora oladi' });
     }
 
-    // db.all_p ishlatildi — database.js da mavjud
     const rows = await db.all_p(
       'SELECT * FROM login_logs ORDER BY created_at DESC LIMIT 200',
       []
@@ -115,7 +199,7 @@ router.get('/login-logs', async (req, res) => {
   }
 });
 
-// Admin maxsus kodni tekshirish
+// ─── ADMIN KODNI TEKSHIRISH ───────────────────────────────────────────────
 router.post('/admin-verify', async (req, res) => {
   const { code } = req.body;
   if (code === ADMIN_SECRET) {
@@ -125,7 +209,7 @@ router.post('/admin-verify', async (req, res) => {
   }
 });
 
-// Register
+// ─── REGISTER ─────────────────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
     const { username, password, full_name, role } = req.body;
