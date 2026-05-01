@@ -22,6 +22,10 @@ db.run_p(`
   )
 `, []).catch(() => {});
 
+// Ustunlar mavjud bo'lmasa qo'shish
+db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS user_id INTEGER`, []).catch(() => {});
+db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS action VARCHAR(20) DEFAULT 'login'`, []).catch(() => {});
+
 // Login
 router.post('/login', async (req, res) => {
   try {
@@ -51,10 +55,11 @@ router.post('/login', async (req, res) => {
     ).catch(() => {});
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, full_name: user.full_name },
+      { id: user.id, username: user.username, role: user.role, full_name: user.full_name },
       SECRET,
       { expiresIn: '24h' }
     );
+
     res.json({
       token,
       user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role }
@@ -64,7 +69,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Logout — tokenni log qilish
+// Logout
 router.post('/logout', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -87,11 +92,22 @@ router.get('/login-logs', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'Token kerak' });
-    const decoded = jwt.verify(token, SECRET);
-    if (decoded.role !== 'admin') return res.status(403).json({ message: 'Ruxsat yoq' });
 
-    const { rows } = await db.query_p(
-      'SELECT * FROM login_logs ORDER BY created_at DESC LIMIT 200'
+    let decoded;
+    try {
+      decoded = jwt.verify(token, SECRET);
+    } catch (e) {
+      return res.status(401).json({ message: 'Token yaroqsiz' });
+    }
+
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ message: 'Faqat admin kora oladi' });
+    }
+
+    // db.all_p ishlatildi — database.js da mavjud
+    const rows = await db.all_p(
+      'SELECT * FROM login_logs ORDER BY created_at DESC LIMIT 200',
+      []
     );
     res.json(rows);
   } catch (e) {
