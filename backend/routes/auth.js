@@ -7,12 +7,13 @@ const db = require('../database');
 const SECRET = process.env.JWT_SECRET || 'maktab_tizim_secret_2024';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'maktab_admin_2024';
 
-// Brute Force himoya (xotirada saqlanadi)
+// ─── Brute Force himoya (xotirada saqlanadi) ──────────────────────────────
+// { ip: { count: 0, lastAttempt: Date, blockedUntil: Date } }
 const loginAttempts = {};
 
-const MAX_ATTEMPTS = 5;
-const BLOCK_DURATION = 15 * 60 * 1000;
-const WINDOW_DURATION = 10 * 60 * 1000;
+const MAX_ATTEMPTS = 5;          // maksimal urinish
+const BLOCK_DURATION = 15 * 60 * 1000; // 15 daqiqa blok
+const WINDOW_DURATION = 10 * 60 * 1000; // 10 daqiqa ichida
 
 function getAttemptInfo(ip) {
   if (!loginAttempts[ip]) {
@@ -26,6 +27,7 @@ function isBlocked(ip) {
   if (info.blockedUntil && new Date() < new Date(info.blockedUntil)) {
     return true;
   }
+  // Blok vaqti o'tgan bo'lsa — tozalash
   if (info.blockedUntil && new Date() >= new Date(info.blockedUntil)) {
     loginAttempts[ip] = { count: 0, lastAttempt: null, blockedUntil: null };
   }
@@ -35,11 +37,15 @@ function isBlocked(ip) {
 function recordFailedAttempt(ip) {
   const info = getAttemptInfo(ip);
   const now = new Date();
+
+  // Oxirgi urinishdan 10 daqiqa o'tgan bo'lsa — reset
   if (info.lastAttempt && (now - new Date(info.lastAttempt)) > WINDOW_DURATION) {
     info.count = 0;
   }
+
   info.count += 1;
   info.lastAttempt = now;
+
   if (info.count >= MAX_ATTEMPTS) {
     info.blockedUntil = new Date(now.getTime() + BLOCK_DURATION);
   }
@@ -53,10 +59,10 @@ function getRemainingTime(ip) {
   const info = getAttemptInfo(ip);
   if (!info.blockedUntil) return 0;
   const remaining = new Date(info.blockedUntil) - new Date();
-  return Math.ceil(remaining / 60000);
+  return Math.ceil(remaining / 60000); // minutda
 }
 
-// Login logs jadvalini yaratish
+// ─── Login logs jadvalini yaratish ────────────────────────────────────────
 db.run_p(`
   CREATE TABLE IF NOT EXISTS login_logs (
     id SERIAL PRIMARY KEY,
@@ -74,29 +80,13 @@ db.run_p(`
 db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS user_id INTEGER`, []).catch(() => {});
 db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS action VARCHAR(20) DEFAULT 'login'`, []).catch(() => {});
 
-// 10 kundan eski login loglarini avtomatik o'chirish
-async function cleanOldLogs() {
-  try {
-    const result = await db.run_p(
-      `DELETE FROM login_logs WHERE created_at < NOW() - INTERVAL '10 days'`,
-      []
-    );
-    console.log('Eski login loglar tozalandi (10 kundan eski)');
-  } catch (e) {
-    console.error('Log tozalashda xatolik:', e.message);
-  }
-}
-
-// Har 24 soatda bir marta tozalash
-cleanOldLogs();
-setInterval(cleanOldLogs, 24 * 60 * 60 * 1000);
-
-// LOGIN
+// ─── LOGIN ─────────────────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
 
+    // Brute force tekshiruvi
     if (isBlocked(ip)) {
       const mins = getRemainingTime(ip);
       return res.status(429).json({
@@ -140,6 +130,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Muvaffaqiyatli — urinishlarni tozalash
     clearAttempts(ip);
 
     await db.run_p(
@@ -163,7 +154,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// LOGOUT
+// ─── LOGOUT ────────────────────────────────────────────────────────────────
 router.post('/logout', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -181,7 +172,7 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-// LOGIN LOGLARINI OLISH - faqat admin
+// ─── LOGIN LOGLARINI OLISH — faqat admin ──────────────────────────────────
 router.get('/login-logs', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -208,7 +199,7 @@ router.get('/login-logs', async (req, res) => {
   }
 });
 
-// ADMIN KODNI TEKSHIRISH
+// ─── ADMIN KODNI TEKSHIRISH ───────────────────────────────────────────────
 router.post('/admin-verify', async (req, res) => {
   const { code } = req.body;
   if (code === ADMIN_SECRET) {
@@ -218,7 +209,7 @@ router.post('/admin-verify', async (req, res) => {
   }
 });
 
-// REGISTER
+// ─── REGISTER ─────────────────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
     const { username, password, full_name, role } = req.body;
