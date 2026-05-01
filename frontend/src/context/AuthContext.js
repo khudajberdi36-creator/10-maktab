@@ -12,19 +12,9 @@ export const AuthProvider = ({ children }) => {
     return u ? JSON.parse(u) : null;
   });
 
-  const [adminVerified, setAdminVerifiedState] = useState(() => {
+  const [adminVerified, setAdminVerified] = useState(() => {
     return localStorage.getItem('adminVerified') === 'true';
   });
-
-  // ✅ Har ikkisini birga yangilaydigan funksiya
-  const setAdminVerified = (val) => {
-    if (val) {
-      localStorage.setItem('adminVerified', 'true');
-    } else {
-      localStorage.removeItem('adminVerified');
-    }
-    setAdminVerifiedState(val);
-  };
 
   const login = async (username, password) => {
     const res = await axios.post('/api/auth/login', { username, password });
@@ -41,14 +31,14 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('adminVerified');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
-    setAdminVerifiedState(false);
+    setAdminVerified(false);
   };
 
   const token = localStorage.getItem('token');
   if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, adminVerified, setAdminVerified }}>
+    <AuthContext.Provider value={{ user, login, logout, adminVerified }}>
       {children}
     </AuthContext.Provider>
   );
