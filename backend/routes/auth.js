@@ -11,9 +11,11 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || 'maktab_admin_2024';
 db.run_p(`
   CREATE TABLE IF NOT EXISTS login_logs (
     id SERIAL PRIMARY KEY,
+    user_id INTEGER,
     username VARCHAR(100),
     full_name VARCHAR(200),
     role VARCHAR(50),
+    action VARCHAR(20) DEFAULT 'login',
     status VARCHAR(20),
     ip VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -29,23 +31,23 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
       await db.run_p(
-        'INSERT INTO login_logs (username, status, ip) VALUES ($1, $2, $3)',
-        [username, 'failed', ip]
+        'INSERT INTO login_logs (username, action, status, ip) VALUES ($1, $2, $3, $4)',
+        [username, 'login', 'failed', ip]
       ).catch(() => {});
       return res.status(401).json({ message: "Foydalanuvchi topilmadi" });
     }
 
     if (!bcrypt.compareSync(password, user.password)) {
       await db.run_p(
-        'INSERT INTO login_logs (username, full_name, role, status, ip) VALUES ($1, $2, $3, $4, $5)',
-        [username, user.full_name, user.role, 'failed', ip]
+        'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [user.id, username, user.full_name, user.role, 'login', 'failed', ip]
       ).catch(() => {});
       return res.status(401).json({ message: "Parol noto'g'ri" });
     }
 
     await db.run_p(
-      'INSERT INTO login_logs (username, full_name, role, status, ip) VALUES ($1, $2, $3, $4, $5)',
-      [username, user.full_name, user.role, 'success', ip]
+      'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [user.id, username, user.full_name, user.role, 'login', 'success', ip]
     ).catch(() => {});
 
     const token = jwt.sign(
@@ -57,6 +59,41 @@ router.post('/login', async (req, res) => {
       token,
       user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role }
     });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Logout — tokenni log qilish
+router.post('/logout', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const decoded = jwt.verify(token, SECRET);
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      await db.run_p(
+        'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [decoded.id, decoded.username || '', decoded.full_name, decoded.role, 'logout', 'success', ip]
+      ).catch(() => {});
+    }
+    res.json({ message: 'Chiqildi' });
+  } catch (e) {
+    res.json({ message: 'Chiqildi' });
+  }
+});
+
+// Login loglarini olish — faqat admin
+router.get('/login-logs', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Token kerak' });
+    const decoded = jwt.verify(token, SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ message: 'Ruxsat yoq' });
+
+    const { rows } = await db.query_p(
+      'SELECT * FROM login_logs ORDER BY created_at DESC LIMIT 200'
+    );
+    res.json(rows);
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
