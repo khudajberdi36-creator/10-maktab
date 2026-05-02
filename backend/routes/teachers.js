@@ -12,79 +12,11 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// ─── Ruxsat etilgan fayl turlari ─────────────────────────────────────────
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-const ALLOWED_DOC_TYPES   = [
-  'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-];
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;  // 5 MB
-const MAX_DOC_SIZE   = 10 * 1024 * 1024; // 10 MB
-
-// ─── Multer storage ────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, uuidv4() + ext);
-  }
+  filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
-
-// Rasm uchun filter
-const imageFilter = (req, file, cb) => {
-  if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Faqat JPG, PNG yoki WEBP rasm yuklanadi!'), false);
-  }
-};
-
-// Hujjat uchun filter
-const docFilter = (req, file, cb) => {
-  if (ALLOWED_DOC_TYPES.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Faqat JPG, PNG, PDF yoki Word fayl yuklanadi!'), false);
-  }
-};
-
-const uploadPhoto = multer({
-  storage,
-  fileFilter: imageFilter,
-  limits: { fileSize: MAX_IMAGE_SIZE }
-});
-
-const uploadDoc = multer({
-  storage,
-  fileFilter: docFilter,
-  limits: { fileSize: MAX_DOC_SIZE }
-});
-
-// ─── Faylni diskdan o'chirish ──────────────────────────────────────────────
-function deleteFile(filename) {
-  if (!filename) return;
-  const filePath = path.join(UPLOADS_DIR, filename);
-  if (fs.existsSync(filePath)) {
-    try { fs.unlinkSync(filePath); } catch {}
-  }
-}
-
-// ─── Multer xatoliklarini ushlash ─────────────────────────────────────────
-function handleMulterError(err, res) {
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: "Fayl hajmi juda katta! Maksimal: 5MB rasm, 10MB hujjat" });
-    }
-    return res.status(400).json({ message: err.message });
-  }
-  if (err) {
-    return res.status(400).json({ message: err.message });
-  }
-  return null;
-}
+const upload = multer({ storage });
 
 const FIELDS = [
   'first_name','last_name','middle_name','birth_date','gender','photo',
@@ -95,7 +27,7 @@ const FIELDS = [
   'diploma_number','diploma_date','status','notes'
 ];
 
-// ─── GET all documents ─────────────────────────────────────────────────────
+// GET all documents ✅ YANGI
 router.get('/documents/all', auth, async (req, res) => {
   try {
     const docs = await db.all_p(`
@@ -110,7 +42,7 @@ router.get('/documents/all', auth, async (req, res) => {
   }
 });
 
-// ─── GET all certificates ──────────────────────────────────────────────────
+// GET all certificates
 router.get('/certificates/all', auth, async (req, res) => {
   try {
     const certs = await db.all_p(`
@@ -125,7 +57,7 @@ router.get('/certificates/all', auth, async (req, res) => {
   }
 });
 
-// ─── GET all teachers ──────────────────────────────────────────────────────
+// GET all teachers
 router.get('/', auth, async (req, res) => {
   try {
     const { search, status } = req.query;
@@ -152,26 +84,21 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// ─── GET one teacher ───────────────────────────────────────────────────────
+// GET one teacher
 router.get('/:id', auth, async (req, res) => {
   try {
     const t = await db.get_p('SELECT * FROM teachers WHERE id = $1', [req.params.id]);
     if (!t) return res.status(404).json({ message: "O'qituvchi topilmadi" });
     t.certificates = await db.all_p('SELECT * FROM certificates WHERE teacher_id = $1', [req.params.id]);
-    t.documents    = await db.all_p('SELECT * FROM documents WHERE teacher_id = $1', [req.params.id]);
+    t.documents = await db.all_p('SELECT * FROM documents WHERE teacher_id = $1', [req.params.id]);
     res.json(t);
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-// ─── POST create teacher ───────────────────────────────────────────────────
-router.post('/', auth, (req, res, next) => {
-  uploadPhoto.single('photo')(req, res, (err) => {
-    if (handleMulterError(err, res)) return;
-    next();
-  });
-}, async (req, res) => {
+// POST create teacher
+router.post('/', auth, upload.single('photo'), async (req, res) => {
   try {
     const d = { ...req.body };
     if (req.file) d.photo = req.file.filename;
@@ -189,22 +116,11 @@ router.post('/', auth, (req, res, next) => {
   }
 });
 
-// ─── PUT update teacher ────────────────────────────────────────────────────
-router.put('/:id', auth, (req, res, next) => {
-  uploadPhoto.single('photo')(req, res, (err) => {
-    if (handleMulterError(err, res)) return;
-    next();
-  });
-}, async (req, res) => {
+// PUT update teacher
+router.put('/:id', auth, upload.single('photo'), async (req, res) => {
   try {
     const d = { ...req.body };
-
-    // Yangi rasm yuklansa — eskisini diskdan o'chirish
-    if (req.file) {
-      const old = await db.get_p('SELECT photo FROM teachers WHERE id = $1', [req.params.id]);
-      if (old?.photo) deleteFile(old.photo);
-      d.photo = req.file.filename;
-    }
+    if (req.file) d.photo = req.file.filename;
 
     const cols = FIELDS.filter(f => f !== 'id' && (f !== 'photo' || d.photo));
     const setClauses = cols.map((c, i) => `${c} = $${i + 1}`).join(', ');
@@ -221,21 +137,9 @@ router.put('/:id', auth, (req, res, next) => {
   }
 });
 
-// ─── DELETE teacher ────────────────────────────────────────────────────────
+// DELETE teacher
 router.delete('/:id', auth, async (req, res) => {
   try {
-    // Rasmni diskdan o'chirish
-    const teacher = await db.get_p('SELECT photo FROM teachers WHERE id = $1', [req.params.id]);
-    if (teacher?.photo) deleteFile(teacher.photo);
-
-    // Hujjat fayllarini o'chirish
-    const docs = await db.all_p('SELECT file_path FROM documents WHERE teacher_id = $1', [req.params.id]);
-    docs.forEach(d => { if (d.file_path) deleteFile(d.file_path); });
-
-    // Sertifikat fayllarini o'chirish
-    const certs = await db.all_p('SELECT file_path FROM certificates WHERE teacher_id = $1', [req.params.id]);
-    certs.forEach(c => { if (c.file_path) deleteFile(c.file_path); });
-
     await db.run_p('DELETE FROM teachers WHERE id = $1', [req.params.id]);
     res.json({ message: "O'qituvchi o'chirildi" });
   } catch (e) {
@@ -243,13 +147,8 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// ─── POST certificate ──────────────────────────────────────────────────────
-router.post('/:id/certificates', auth, (req, res, next) => {
-  uploadDoc.single('file')(req, res, (err) => {
-    if (handleMulterError(err, res)) return;
-    next();
-  });
-}, async (req, res) => {
+// POST certificate
+router.post('/:id/certificates', auth, upload.single('file'), async (req, res) => {
   try {
     const { name, issued_by, issued_date, expire_date, certificate_number } = req.body;
     const file_path = req.file?.filename || null;
@@ -264,12 +163,9 @@ router.post('/:id/certificates', auth, (req, res, next) => {
   }
 });
 
-// ─── DELETE certificate ────────────────────────────────────────────────────
+// DELETE certificate
 router.delete('/:id/certificates/:cid', auth, async (req, res) => {
   try {
-    const cert = await db.get_p('SELECT file_path FROM certificates WHERE id = $1', [req.params.cid]);
-    if (cert?.file_path) deleteFile(cert.file_path);
-
     await db.run_p('DELETE FROM certificates WHERE id = $1 AND teacher_id = $2',
       [req.params.cid, req.params.id]);
     res.json({ message: "Sertifikat o'chirildi" });
@@ -278,13 +174,8 @@ router.delete('/:id/certificates/:cid', auth, async (req, res) => {
   }
 });
 
-// ─── POST document ─────────────────────────────────────────────────────────
-router.post('/:id/documents', auth, (req, res, next) => {
-  uploadDoc.fields([{ name: 'file', maxCount: 10 }])(req, res, (err) => {
-    if (handleMulterError(err, res)) return;
-    next();
-  });
-}, async (req, res) => {
+// POST document
+router.post('/:id/documents', auth, upload.fields([{ name: 'file', maxCount: 10 }]), async (req, res) => {
   try {
     const { doc_type, doc_name, onid_number, onid_login, onid_password } = req.body;
     const files = req.files?.file || [];
@@ -310,12 +201,9 @@ router.post('/:id/documents', auth, (req, res, next) => {
   }
 });
 
-// ─── DELETE document ───────────────────────────────────────────────────────
+// DELETE document
 router.delete('/:id/documents/:did', auth, async (req, res) => {
   try {
-    const doc = await db.get_p('SELECT file_path FROM documents WHERE id = $1', [req.params.did]);
-    if (doc?.file_path) deleteFile(doc.file_path);
-
     await db.run_p('DELETE FROM documents WHERE id = $1 AND teacher_id = $2',
       [req.params.did, req.params.id]);
     res.json({ message: "Hujjat o'chirildi" });
