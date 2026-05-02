@@ -7,59 +7,37 @@ const db = require('../database');
 const SECRET = process.env.JWT_SECRET || 'maktab_tizim_secret_2024';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'maktab_admin_2024';
 
-// ─── Brute Force himoya (xotirada saqlanadi) ──────────────────────────────
-// { ip: { count: 0, lastAttempt: Date, blockedUntil: Date } }
+// ─── Brute Force himoya ───────────────────────────────────────────────────
 const loginAttempts = {};
-
-const MAX_ATTEMPTS = 5;          // maksimal urinish
-const BLOCK_DURATION = 15 * 60 * 1000; // 15 daqiqa blok
-const WINDOW_DURATION = 10 * 60 * 1000; // 10 daqiqa ichida
+const MAX_ATTEMPTS    = 5;
+const BLOCK_DURATION  = 15 * 60 * 1000; // 15 daqiqa
+const WINDOW_DURATION = 10 * 60 * 1000; // 10 daqiqa
 
 function getAttemptInfo(ip) {
-  if (!loginAttempts[ip]) {
-    loginAttempts[ip] = { count: 0, lastAttempt: null, blockedUntil: null };
-  }
+  if (!loginAttempts[ip]) loginAttempts[ip] = { count: 0, lastAttempt: null, blockedUntil: null };
   return loginAttempts[ip];
 }
-
 function isBlocked(ip) {
   const info = getAttemptInfo(ip);
-  if (info.blockedUntil && new Date() < new Date(info.blockedUntil)) {
-    return true;
-  }
-  // Blok vaqti o'tgan bo'lsa — tozalash
+  if (info.blockedUntil && new Date() < new Date(info.blockedUntil)) return true;
   if (info.blockedUntil && new Date() >= new Date(info.blockedUntil)) {
     loginAttempts[ip] = { count: 0, lastAttempt: null, blockedUntil: null };
   }
   return false;
 }
-
 function recordFailedAttempt(ip) {
   const info = getAttemptInfo(ip);
   const now = new Date();
-
-  // Oxirgi urinishdan 10 daqiqa o'tgan bo'lsa — reset
-  if (info.lastAttempt && (now - new Date(info.lastAttempt)) > WINDOW_DURATION) {
-    info.count = 0;
-  }
-
+  if (info.lastAttempt && (now - new Date(info.lastAttempt)) > WINDOW_DURATION) info.count = 0;
   info.count += 1;
   info.lastAttempt = now;
-
-  if (info.count >= MAX_ATTEMPTS) {
-    info.blockedUntil = new Date(now.getTime() + BLOCK_DURATION);
-  }
+  if (info.count >= MAX_ATTEMPTS) info.blockedUntil = new Date(now.getTime() + BLOCK_DURATION);
 }
-
-function clearAttempts(ip) {
-  delete loginAttempts[ip];
-}
-
+function clearAttempts(ip) { delete loginAttempts[ip]; }
 function getRemainingTime(ip) {
   const info = getAttemptInfo(ip);
   if (!info.blockedUntil) return 0;
-  const remaining = new Date(info.blockedUntil) - new Date();
-  return Math.ceil(remaining / 60000); // minutda
+  return Math.ceil((new Date(info.blockedUntil) - new Date()) / 60000);
 }
 
 // ─── Login logs jadvalini yaratish ────────────────────────────────────────
@@ -80,13 +58,50 @@ db.run_p(`
 db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS user_id INTEGER`, []).catch(() => {});
 db.run_p(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS action VARCHAR(20) DEFAULT 'login'`, []).catch(() => {});
 
+// ─── 10 KUNLIK AVTOMATIK LOG TOZALASH ────────────────────────────────────
+// Server ishga tushganda eski loglarni o'chirish
+async function cleanOldLogs() {
+  try {
+    const result = await db.run_p(
+      `DELETE FROM login_logs WHERE created_at < NOW() - INTERVAL '10 days'`,
+      []
+    );
+    if (result.changes > 0) {
+      console.log(`🧹 ${result.changes} ta eski log o'chirildi (10 kundan eski)`);
+    }
+  } catch (e) {
+    console.error('Log tozalashda xatolik:', e.message);
+  }
+}
+
+// Ishga tushganda bir marta
+cleanOldLogs();
+
+// Har kuni soat 02:00 da tozalash
+function scheduleDailyCleanup() {
+  const now = new Date();
+  const next2am = new Date();
+  next2am.setHours(2, 0, 0, 0);
+  if (next2am <= now) next2am.setDate(next2am.getDate() + 1);
+
+  const msUntil2am = next2am - now;
+
+  setTimeout(() => {
+    cleanOldLogs();
+    // Keyin har 24 soatda takrorlash
+    setInterval(cleanOldLogs, 24 * 60 * 60 * 1000);
+  }, msUntil2am);
+
+  console.log(`⏰ Log tozalash rejalashtirildi: har kuni 02:00 da`);
+}
+scheduleDailyCleanup();
+
 // ─── LOGIN ─────────────────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || 'unknown';
 
-    // Brute force tekshiruvi
     if (isBlocked(ip)) {
       const mins = getRemainingTime(ip);
       return res.status(429).json({
@@ -98,14 +113,11 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
       recordFailedAttempt(ip);
-      const info = getAttemptInfo(ip);
-      const left = MAX_ATTEMPTS - info.count;
-
+      const left = MAX_ATTEMPTS - getAttemptInfo(ip).count;
       await db.run_p(
-        'INSERT INTO login_logs (username, action, status, ip) VALUES ($1, $2, $3, $4)',
+        'INSERT INTO login_logs (username, action, status, ip) VALUES ($1,$2,$3,$4)',
         [username, 'login', 'failed', ip]
       ).catch(() => {});
-
       return res.status(401).json({
         message: left > 0
           ? `Foydalanuvchi topilmadi. ${left} ta urinish qoldi.`
@@ -115,14 +127,11 @@ router.post('/login', async (req, res) => {
 
     if (!bcrypt.compareSync(password, user.password)) {
       recordFailedAttempt(ip);
-      const info = getAttemptInfo(ip);
-      const left = MAX_ATTEMPTS - info.count;
-
+      const left = MAX_ATTEMPTS - getAttemptInfo(ip).count;
       await db.run_p(
         'INSERT INTO login_logs (user_id, username, full_name, role, action, status, ip) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [user.id, username, user.full_name, user.role, 'login', 'failed', ip]
       ).catch(() => {});
-
       return res.status(401).json({
         message: left > 0
           ? `Parol noto'g'ri. ${left} ta urinish qoldi.`
@@ -130,7 +139,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Muvaffaqiyatli — urinishlarni tozalash
     clearAttempts(ip);
 
     await db.run_p(
@@ -148,7 +156,6 @@ router.post('/login', async (req, res) => {
       token,
       user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role }
     });
-
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -172,26 +179,20 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-// ─── LOGIN LOGLARINI OLISH — faqat admin ──────────────────────────────────
+// ─── LOGIN LOGLARINI OLISH ─────────────────────────────────────────────────
 router.get('/login-logs', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'Token kerak' });
 
     let decoded;
-    try {
-      decoded = jwt.verify(token, SECRET);
-    } catch {
-      return res.status(401).json({ message: 'Token yaroqsiz yoki muddati tugagan' });
-    }
+    try { decoded = jwt.verify(token, SECRET); }
+    catch { return res.status(401).json({ message: 'Token yaroqsiz' }); }
 
-    if (decoded.role !== 'admin') {
-      return res.status(403).json({ message: 'Faqat admin kora oladi' });
-    }
+    if (decoded.role !== 'admin') return res.status(403).json({ message: 'Faqat admin ko\'ra oladi' });
 
     const rows = await db.all_p(
-      'SELECT * FROM login_logs ORDER BY created_at DESC LIMIT 200',
-      []
+      'SELECT * FROM login_logs ORDER BY created_at DESC LIMIT 200', []
     );
     res.json(rows);
   } catch (e) {
@@ -199,14 +200,11 @@ router.get('/login-logs', async (req, res) => {
   }
 });
 
-// ─── ADMIN KODNI TEKSHIRISH ───────────────────────────────────────────────
+// ─── ADMIN VERIFY ──────────────────────────────────────────────────────────
 router.post('/admin-verify', async (req, res) => {
   const { code } = req.body;
-  if (code === ADMIN_SECRET) {
-    res.json({ verified: true });
-  } else {
-    res.status(401).json({ message: "Admin kodi noto'g'ri" });
-  }
+  if (code === ADMIN_SECRET) res.json({ verified: true });
+  else res.status(401).json({ message: "Admin kodi noto'g'ri" });
 });
 
 // ─── REGISTER ─────────────────────────────────────────────────────────────

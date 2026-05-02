@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const SECRET = 'maktab_tizim_secret_2024';
+
+const SECRET = process.env.JWT_SECRET || 'maktab_tizim_secret_2024';
 
 module.exports = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -7,7 +8,10 @@ module.exports = (req, res, next) => {
   try {
     req.user = jwt.verify(token, SECRET);
     next();
-  } catch {
+  } catch (e) {
+    if (e.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token muddati tugagan, qayta kiring' });
+    }
     res.status(401).json({ message: 'Token yaroqsiz' });
   }
 };
