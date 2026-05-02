@@ -84,10 +84,12 @@ export default function Users() {
     }
     setSaving(true);
     try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
       if (editUser) {
-        await axios.put(`/api/users/${editUser.id}`, form);
+        await axios.put(`/api/users/${editUser.id}`, form, { headers });
       } else {
-        await axios.post('/api/users', form);
+        await axios.post('/api/users', form, { headers });
       }
       setSuccess(editUser ? "Foydalanuvchi yangilandi ✅" : "Yangi foydalanuvchi qo'shildi ✅");
       setShowModal(false);
@@ -103,7 +105,10 @@ export default function Users() {
   const handleDelete = async (user) => {
     if (!window.confirm(`"${user.full_name}" ni o'chirishni tasdiqlaysizmi?`)) return;
     try {
-      await axios.delete(`/api/users/${user.id}`);
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/users/${user.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSuccess("Foydalanuvchi o'chirildi");
       fetchUsers();
       setTimeout(() => setSuccess(''), 3000);
