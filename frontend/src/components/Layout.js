@@ -10,41 +10,25 @@ export default function Layout() {
   const navigate = useNavigate();
   const mainRef = useRef(null);
 
-  // ─── Token muddatini tekshirish ───────────────────────────────────────────
   useEffect(() => {
     const checkToken = () => {
       const token = localStorage.getItem('token');
       if (!token) { logout(); navigate('/login'); return; }
-
       try {
-        // JWT payload ni decode qilish (verify emas, faqat muddatni ko'rish)
         const payload = JSON.parse(atob(token.split('.')[1]));
         const now = Math.floor(Date.now() / 1000);
-
-        if (payload.exp && payload.exp < now) {
-          // Token muddati tugagan
-          logout();
-          navigate('/login');
-        }
-      } catch {
-        logout();
-        navigate('/login');
-      }
+        if (payload.exp && payload.exp < now) { logout(); navigate('/login'); }
+      } catch { logout(); navigate('/login'); }
     };
-
-    // Sahifa ochilganda tekshir
     checkToken();
-
-    // Har 5 daqiqada tekshir
     const interval = setInterval(checkToken, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // ─── Sahifalar orasida o'tish animatsiyasi ────────────────────────────────
   useEffect(() => {
     if (mainRef.current) {
       mainRef.current.style.animation = 'none';
-      void mainRef.current.offsetHeight; // reflow
+      void mainRef.current.offsetHeight;
       mainRef.current.style.animation = 'fadeInUp 0.35s cubic-bezier(0.22,1,0.36,1) both';
     }
   }, [location.pathname]);
@@ -61,6 +45,8 @@ export default function Layout() {
     if (location.pathname === '/users') return "👥 Foydalanuvchilar";
     return "Tizim";
   };
+
+  const isAdminOrDirektor = user?.role === 'admin' || user?.role === 'direktor';
 
   return (
     <div className="layout">
@@ -81,7 +67,7 @@ export default function Layout() {
             </NavLink>
           </div>
 
-          {(user?.role === 'admin' || user?.role === 'direktor') && (
+          {isAdminOrDirektor && (
             <div className="nav-section">
               <div className="nav-section-title">Boshqaruv</div>
               <NavLink to="/teachers/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -103,7 +89,7 @@ export default function Layout() {
             </NavLink>
           </div>
 
-          {user?.role === 'admin' && (
+          {isAdminOrDirektor && (
             <div className="nav-section">
               <div className="nav-section-title">Tizim</div>
               <NavLink to="/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
