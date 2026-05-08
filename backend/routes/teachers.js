@@ -16,7 +16,22 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname))
 });
-const upload = multer({ storage });
+
+// 5 MB limit
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    // Ruxsat etilgan fayl turlari
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname || mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error("Fayl turi ruxsat etilmagan! (jpeg, jpg, png, gif, pdf, doc, docx, xls, xlsx, txt)"));
+  }
+});
 
 const FIELDS = [
   'first_name','last_name','middle_name','birth_date','gender','photo',
@@ -27,7 +42,21 @@ const FIELDS = [
   'diploma_number','diploma_date','status','notes'
 ];
 
-// GET all documents ✅ YANGI
+// Multer xatoliklarini qayta ishlash middleware
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: "Fayl hajmi 5 MB dan oshmasligi kerak!" });
+    }
+    return res.status(400).json({ message: `Fayl yuklashda xatolik: ${err.message}` });
+  }
+  if (err) {
+    return res.status(400).json({ message: err.message });
+  }
+  next();
+};
+
+// GET all documents
 router.get('/documents/all', auth, async (req, res) => {
   try {
     const docs = await db.all_p(`
@@ -98,7 +127,12 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // POST create teacher
-router.post('/', auth, upload.single('photo'), async (req, res) => {
+router.post('/', auth, (req, res, next) => {
+  upload.single('photo')(req, res, (err) => {
+    if (err) return handleMulterError(err, req, res, next);
+    next();
+  });
+}, async (req, res) => {
   try {
     const d = { ...req.body };
     if (req.file) d.photo = req.file.filename;
@@ -117,7 +151,12 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
 });
 
 // PUT update teacher
-router.put('/:id', auth, upload.single('photo'), async (req, res) => {
+router.put('/:id', auth, (req, res, next) => {
+  upload.single('photo')(req, res, (err) => {
+    if (err) return handleMulterError(err, req, res, next);
+    next();
+  });
+}, async (req, res) => {
   try {
     const d = { ...req.body };
     if (req.file) d.photo = req.file.filename;
@@ -148,7 +187,12 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // POST certificate
-router.post('/:id/certificates', auth, upload.single('file'), async (req, res) => {
+router.post('/:id/certificates', auth, (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) return handleMulterError(err, req, res, next);
+    next();
+  });
+}, async (req, res) => {
   try {
     const { name, issued_by, issued_date, expire_date, certificate_number } = req.body;
     const file_path = req.file?.filename || null;
@@ -175,7 +219,12 @@ router.delete('/:id/certificates/:cid', auth, async (req, res) => {
 });
 
 // POST document
-router.post('/:id/documents', auth, upload.fields([{ name: 'file', maxCount: 10 }]), async (req, res) => {
+router.post('/:id/documents', auth, (req, res, next) => {
+  upload.fields([{ name: 'file', maxCount: 10 }])(req, res, (err) => {
+    if (err) return handleMulterError(err, req, res, next);
+    next();
+  });
+}, async (req, res) => {
   try {
     const { doc_type, doc_name, onid_number, onid_login, onid_password } = req.body;
     const files = req.files?.file || [];

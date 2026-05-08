@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const roleLabels = {
   admin: '🛡️ Administrator',
-  direktor: '👔 Direktor',
+  direktor: '🏫 Direktor',
   oquvchi: "👨‍🏫 O'qituvchi"
 };
 
@@ -18,7 +18,7 @@ const emptyForm = { username:'', password:'', full_name:'', role:'direktor', col
 export default function Users() {
   const [users, setUsers]       = useState([]);
   const [logs, setLogs]         = useState([]);
-  const [tab, setTab]           = useState('users'); // 'users' | 'logs'
+  const [tab, setTab]           = useState('users');
   const [loading, setLoading]   = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -27,7 +27,9 @@ export default function Users() {
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
-  const [logFilter, setLogFilter] = useState('all'); // all | login | logout | failed
+  const [logFilter, setLogFilter] = useState('all');
+  const [clearingLogs, setClearingLogs] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -59,6 +61,25 @@ export default function Users() {
       setError("Loglarni yuklashda xatolik");
     } finally {
       setLogsLoading(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    try {
+      setClearingLogs(true);
+      const token = localStorage.getItem('token');
+      await axios.delete('/api/auth/login-logs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLogs([]);
+      setShowClearConfirm(false);
+      setSuccess("Kirish tarixi tozalandi ✅");
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e) {
+      setError(e.response?.data?.message || "Tozalashda xatolik yuz berdi");
+      setShowClearConfirm(false);
+    } finally {
+      setClearingLogs(false);
     }
   };
 
@@ -117,7 +138,6 @@ export default function Users() {
     }
   };
 
-  // Log statistikasi
   const logStats = {
     total:   logs.length,
     success: logs.filter(l => l.status === 'success').length,
@@ -153,7 +173,22 @@ export default function Users() {
           <button className="btn btn-primary" onClick={openAdd}>➕ Yangi foydalanuvchi</button>
         )}
         {tab === 'logs' && (
-          <button className="btn btn-outline" onClick={fetchLogs}>🔄 Yangilash</button>
+          <div style={{display:'flex', gap:8}}>
+            <button className="btn btn-outline" onClick={fetchLogs}>🔄 Yangilash</button>
+            <button
+              className="btn"
+              onClick={() => setShowClearConfirm(true)}
+              disabled={logs.length === 0}
+              style={{
+                background: logs.length === 0 ? '#f1f5f9' : '#fee2e2',
+                color: logs.length === 0 ? '#94a3b8' : '#ef4444',
+                border: logs.length === 0 ? '1px solid #e2e8f0' : '1px solid #fca5a5',
+                cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
+                fontWeight: 700
+              }}>
+              🗑️ Tarixni tozalash
+            </button>
+          </div>
         )}
       </div>
 
@@ -205,7 +240,6 @@ export default function Users() {
                       onMouseEnter={e => e.currentTarget.style.background='#f8fbff'}
                       onMouseLeave={e => e.currentTarget.style.background='transparent'}>
 
-                      {/* ID */}
                       <td style={{padding:'14px 18px'}}>
                         <span style={{
                           background:'#f1f5f9', borderRadius:6,
@@ -214,7 +248,6 @@ export default function Users() {
                         }}>#{user.id}</span>
                       </td>
 
-                      {/* Ismi */}
                       <td style={{padding:'14px 18px'}}>
                         <div style={{display:'flex', alignItems:'center', gap:12}}>
                           <div style={{
@@ -233,12 +266,10 @@ export default function Users() {
                         </div>
                       </td>
 
-                      {/* Username */}
                       <td style={{padding:'14px 18px', color:'var(--text-muted)', fontFamily:'monospace', fontSize:13}}>
                         @{user.username}
                       </td>
 
-                      {/* Rol */}
                       <td style={{padding:'14px 18px'}}>
                         <span style={{
                           padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700,
@@ -249,7 +280,6 @@ export default function Users() {
                         </span>
                       </td>
 
-                      {/* Rang */}
                       <td style={{padding:'14px 18px'}}>
                         <div style={{display:'flex', alignItems:'center', gap:8}}>
                           <div style={{
@@ -263,12 +293,10 @@ export default function Users() {
                         </div>
                       </td>
 
-                      {/* Sana */}
                       <td style={{padding:'14px 18px', color:'var(--text-muted)', fontSize:13}}>
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('uz-UZ') : '—'}
                       </td>
 
-                      {/* Amallar */}
                       <td style={{padding:'14px 18px', textAlign:'right'}}>
                         <div style={{display:'flex', gap:8, justifyContent:'flex-end'}}>
                           <button className="btn btn-outline btn-sm" onClick={() => openEdit(user)}>✏️ Tahrirlash</button>
@@ -330,7 +358,7 @@ export default function Users() {
           <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'wrap'}}>
             {[
               { key:'all',    label:'Barchasi' },
-              { key:'login',  label:'🔐 Kirish' },
+              { key:'login',  label:'📥 Kirish' },
               { key:'logout', label:'🚪 Chiqish' },
               { key:'failed', label:'❌ Xatolik' },
             ].map(f => (
@@ -384,10 +412,8 @@ export default function Users() {
                         onMouseEnter={e => e.currentTarget.style.background = log.status==='failed' ? '#fee2e2' : '#f8fbff'}
                         onMouseLeave={e => e.currentTarget.style.background = log.status==='failed' ? '#fff5f5' : 'transparent'}>
 
-                        {/* Tartib raqami */}
                         <td style={{padding:'12px 16px', color:'var(--text-muted)', fontSize:12}}>{i+1}</td>
 
-                        {/* User ID */}
                         <td style={{padding:'12px 16px'}}>
                           {log.user_id ? (
                             <span style={{
@@ -400,7 +426,6 @@ export default function Users() {
                           )}
                         </td>
 
-                        {/* Foydalanuvchi */}
                         <td style={{padding:'12px 16px'}}>
                           <div style={{fontWeight:700}}>{log.full_name || '—'}</div>
                           <div style={{fontSize:11, color:'var(--text-muted)', fontFamily:'monospace'}}>
@@ -408,7 +433,6 @@ export default function Users() {
                           </div>
                         </td>
 
-                        {/* Rol */}
                         <td style={{padding:'12px 16px'}}>
                           {log.role ? (
                             <span style={{
@@ -421,18 +445,16 @@ export default function Users() {
                           ) : <span style={{color:'var(--text-muted)'}}>—</span>}
                         </td>
 
-                        {/* Amal */}
                         <td style={{padding:'12px 16px'}}>
                           <span style={{
                             padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
                             background: log.action==='login' ? '#dcfce7' : '#fff7ed',
                             color: log.action==='login' ? '#16a34a' : '#c2410c',
                           }}>
-                            {log.action === 'login' ? '🔐 Kirdi' : '🚪 Chiqdi'}
+                            {log.action === 'login' ? '📥 Kirdi' : '🚪 Chiqdi'}
                           </span>
                         </td>
 
-                        {/* Holat */}
                         <td style={{padding:'12px 16px'}}>
                           <span style={{
                             padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
@@ -443,12 +465,10 @@ export default function Users() {
                           </span>
                         </td>
 
-                        {/* IP */}
                         <td style={{padding:'12px 16px', fontFamily:'monospace', fontSize:12, color:'var(--text-muted)'}}>
                           {log.ip || '—'}
                         </td>
 
-                        {/* Vaqt */}
                         <td style={{padding:'12px 16px', fontSize:12, color:'var(--text-muted)', whiteSpace:'nowrap'}}>
                           {formatDate(log.created_at)}
                         </td>
@@ -467,7 +487,54 @@ export default function Users() {
         </div>
       )}
 
-      {/* MODAL */}
+      {/* TARIXNI TOZALASH TASDIQLASH MODALI */}
+      {showClearConfirm && (
+        <div style={{
+          position:'fixed', inset:0,
+          background:'rgba(10,22,40,0.55)',
+          backdropFilter:'blur(4px)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:1000, padding:20
+        }}>
+          <div style={{
+            background:'white', borderRadius:20, padding:36,
+            width:'100%', maxWidth:420,
+            boxShadow:'0 32px 80px rgba(0,0,0,0.25)',
+            animation:'scaleIn 0.3s ease',
+            textAlign:'center'
+          }}>
+            <div style={{fontSize:52, marginBottom:16}}>🗑️</div>
+            <h3 style={{margin:'0 0 10px', fontSize:18, fontWeight:800, color:'#0f1f35'}}>
+              Kirish tarixini tozalash
+            </h3>
+            <p style={{margin:'0 0 28px', color:'var(--text-muted)', fontSize:14, lineHeight:1.6}}>
+              Barcha <strong>{logs.length} ta</strong> kirish tarixi yozuvi o'chiriladi.<br/>
+              Bu amalni ortga qaytarib bo'lmaydi!
+            </p>
+            <div style={{display:'flex', gap:12, justifyContent:'center'}}>
+              <button
+                className="btn btn-outline"
+                onClick={() => setShowClearConfirm(false)}
+                disabled={clearingLogs}
+                style={{minWidth:120}}>
+                Bekor qilish
+              </button>
+              <button
+                className="btn"
+                onClick={handleClearLogs}
+                disabled={clearingLogs}
+                style={{
+                  background:'#ef4444', color:'white',
+                  border:'none', minWidth:120, fontWeight:700
+                }}>
+                {clearingLogs ? '⏳ Tozalanmoqda...' : '🗑️ Ha, tozalash'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FOYDALANUVCHI QO'SHISH / TAHRIRLASH MODALI */}
       {showModal && (
         <div style={{
           position:'fixed', inset:0,
@@ -511,7 +578,7 @@ export default function Users() {
             <div className="form-group" style={{marginBottom:16}}>
               <label className="form-label">Lavozim *</label>
               <select className="form-control" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
-                <option value="direktor">👔 Direktor</option>
+                <option value="direktor">🏫 Direktor</option>
                 <option value="admin">🛡️ Administrator</option>
                 <option value="oquvchi">👨‍🏫 O'qituvchi</option>
               </select>
