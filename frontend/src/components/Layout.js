@@ -12,16 +12,12 @@ export default function Layout() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Dark mode ni <html> ga qo'llash
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
 
-  // Sahifa o'zgarganda sidebar yopilsin (mobile)
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [location.pathname]);
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   useEffect(() => {
     const checkToken = () => {
@@ -61,13 +57,12 @@ export default function Layout() {
 
   const isAdminOrDirektor = user?.role === 'admin' || user?.role === 'direktor';
 
-  const SidebarContent = () => (
+  const NavContent = () => (
     <>
       <div className="sidebar-logo">
         <h2>🏫 Maktab Tizimi</h2>
         <span>O'qituvchilar Ma'lumotlar Bazasi</span>
       </div>
-
       <nav className="sidebar-nav">
         <div className="nav-section">
           <div className="nav-section-title">Asosiy</div>
@@ -78,7 +73,6 @@ export default function Layout() {
             <span className="icon">👨‍🏫</span> O'qituvchilar
           </NavLink>
         </div>
-
         {isAdminOrDirektor && (
           <div className="nav-section">
             <div className="nav-section-title">Boshqaruv</div>
@@ -90,7 +84,6 @@ export default function Layout() {
             </NavLink>
           </div>
         )}
-
         <div className="nav-section">
           <div className="nav-section-title">Ma'lumot</div>
           <NavLink to="/certificates" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -100,7 +93,6 @@ export default function Layout() {
             <span className="icon">📁</span> Hujjatlar
           </NavLink>
         </div>
-
         {isAdminOrDirektor && (
           <div className="nav-section">
             <div className="nav-section-title">Tizim</div>
@@ -110,7 +102,6 @@ export default function Layout() {
           </div>
         )}
       </nav>
-
       <div className="sidebar-user">
         <div className="sidebar-user-info">
           <div className="sidebar-avatar">{user?.full_name?.[0] || 'A'}</div>
@@ -128,62 +119,132 @@ export default function Layout() {
 
   return (
     <div className="layout">
+      <style>{`
+        .dm-toggle {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 16px;
+          border-radius: 20px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 700;
+          font-family: inherit;
+          transition: all 0.2s;
+          background: #f1f5f9;
+          border: 1.5px solid #e2e8f0;
+          color: #475569;
+        }
+        .dm-toggle:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+        .hamburger-btn {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          background: none;
+          border: none;
+          font-size: 22px;
+          cursor: pointer;
+          padding: 6px 10px;
+          border-radius: 8px;
+          color: var(--text, #1e293b);
+          line-height: 1;
+          margin-right: 4px;
+        }
+
+        .mobile-sidebar {
+          display: none;
+          position: fixed;
+          top: 0; left: 0; bottom: 0;
+          width: 268px;
+          z-index: 200;
+          flex-direction: column;
+          transform: translateX(-100%);
+          transition: transform 0.28s cubic-bezier(0.22,1,0.36,1);
+          background: linear-gradient(170deg, #0d1e33 0%, #162840 40%, #1a3254 100%);
+          box-shadow: 4px 0 32px rgba(0,0,0,0.3);
+          overflow-y: auto;
+        }
+        .mobile-sidebar.open { transform: translateX(0); }
+
+        .mob-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          z-index: 199;
+        }
+
+        @media (max-width: 768px) {
+          .sidebar { display: none !important; }
+          .mobile-sidebar { display: flex !important; }
+          .hamburger-btn { display: flex !important; }
+          .topbar-date { display: none !important; }
+          .page { padding: 16px !important; }
+          .topbar { padding: 0 12px !important; }
+        }
+
+        [data-theme="dark"] .dm-toggle {
+          background: #334155;
+          border-color: #475569;
+          color: #e2e8f0;
+        }
+        [data-theme="dark"] body { background: #0f172a !important; color: #f1f5f9; }
+        [data-theme="dark"] .main-content { background: #0f172a !important; }
+        [data-theme="dark"] .topbar {
+          background: #1e293b !important;
+          border-bottom-color: #334155 !important;
+          backdrop-filter: none !important;
+        }
+        [data-theme="dark"] .topbar-title { color: #f1f5f9 !important; }
+        [data-theme="dark"] .hamburger-btn { color: #e2e8f0 !important; }
+        [data-theme="dark"] .card { background: #1e293b !important; border-color: #334155 !important; }
+        [data-theme="dark"] .stat-card { background: #1e293b !important; border-color: #334155 !important; }
+        [data-theme="dark"] .stat-num { color: #f1f5f9 !important; }
+        [data-theme="dark"] .stat-label { color: #94a3b8 !important; }
+        [data-theme="dark"] th { background: #0f172a !important; color: #94a3b8 !important; border-color: #334155 !important; }
+        [data-theme="dark"] td { border-color: #1e293b !important; color: #e2e8f0 !important; }
+        [data-theme="dark"] tr:hover td { background: #263044 !important; }
+        [data-theme="dark"] .form-control { background: #0f172a !important; border-color: #334155 !important; color: #f1f5f9 !important; }
+        [data-theme="dark"] .search-bar { background: #0f172a !important; border-color: #334155 !important; }
+        [data-theme="dark"] .search-bar input { color: #f1f5f9 !important; background: transparent !important; }
+        [data-theme="dark"] .btn-outline { border-color: #334155 !important; color: #cbd5e1 !important; background: transparent !important; }
+        [data-theme="dark"] .btn-outline:hover { background: #1e293b !important; }
+        [data-theme="dark"] .tabs { border-bottom-color: #334155 !important; }
+        [data-theme="dark"] .tab-btn { color: #64748b !important; }
+        [data-theme="dark"] .tab-btn.active { color: #60a5fa !important; border-bottom-color: #3b82f6 !important; background: rgba(96,165,250,0.08) !important; }
+        [data-theme="dark"] .tab-btn:hover { color: #cbd5e1 !important; background: rgba(255,255,255,0.05) !important; }
+        [data-theme="dark"] .card-title { color: #f1f5f9 !important; }
+        [data-theme="dark"] .empty-state h3 { color: #e2e8f0 !important; }
+      `}</style>
+
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position:'fixed', inset:0, background:'rgba(0,0,0,0.5)',
-            zIndex:99, display:'none'
-          }}
-          className="mobile-overlay"
-        />
+        <div className="mob-overlay" onClick={() => setSidebarOpen(false)} />
       )}
+
+      {/* Mobile sidebar */}
+      <aside className={`mobile-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <NavContent />
+      </aside>
 
       {/* Desktop sidebar */}
       <aside className="sidebar">
-        <SidebarContent />
-      </aside>
-
-      {/* Mobile sidebar */}
-      <aside className={`sidebar mobile-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <SidebarContent />
+        <NavContent />
       </aside>
 
       <div className="main-content">
         <header className="topbar">
-          {/* Mobile hamburger */}
-          <button
-            className="hamburger-btn"
-            onClick={() => setSidebarOpen(v => !v)}
-            style={{
-              display:'none', background:'none', border:'none',
-              fontSize:22, cursor:'pointer', color:'var(--text-primary)',
-              padding:'4px 8px', borderRadius:8
-            }}>
-            ☰
-          </button>
-
-          <h1 className="topbar-title">{getTitle()}</h1>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <button className="hamburger-btn" onClick={() => setSidebarOpen(v => !v)}>☰</button>
+            <h1 className="topbar-title">{getTitle()}</h1>
+          </div>
 
           <div className="topbar-right" style={{display:'flex', alignItems:'center', gap:12}}>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
-              {new Date().toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long', day: 'numeric' })}
+            <span className="topbar-date" style={{fontSize:13, color:'var(--text-muted)', fontWeight:600}}>
+              {new Date().toLocaleDateString('uz-UZ', {year:'numeric', month:'long', day:'numeric'})}
             </span>
-
-            {/* Dark mode toggle */}
-            <button
-              onClick={() => setDarkMode(v => !v)}
-              title={darkMode ? "Kunduzgi rejim" : "Tungi rejim"}
-              style={{
-                background: darkMode ? '#334155' : '#f1f5f9',
-                border: 'none', borderRadius:20, padding:'6px 12px',
-                cursor:'pointer', fontSize:16, display:'flex',
-                alignItems:'center', gap:6, fontWeight:600,
-                color: darkMode ? '#e2e8f0' : '#475569',
-                transition:'all 0.2s'
-              }}>
-              {darkMode ? '☀️' : '🌙'}
+            <button className="dm-toggle" onClick={() => setDarkMode(v => !v)}>
+              {darkMode ? '☀️ Kun' : '🌙 Tun'}
             </button>
           </div>
         </header>
@@ -192,29 +253,6 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
-
-      <style>{`
-        @media (max-width: 768px) {
-          .sidebar { display: none !important; }
-          .mobile-sidebar { display: flex !important; }
-          .hamburger-btn { display: flex !important; }
-          .mobile-overlay { display: block !important; }
-          .topbar-title { font-size: 15px !important; }
-        }
-        .mobile-sidebar {
-          display: none;
-          position: fixed;
-          top: 0; left: 0; bottom: 0;
-          width: 260px;
-          z-index: 100;
-          transform: translateX(-100%);
-          transition: transform 0.28s cubic-bezier(0.22,1,0.36,1);
-          flex-direction: column;
-        }
-        .mobile-sidebar.open {
-          transform: translateX(0);
-        }
-      `}</style>
     </div>
   );
 }
