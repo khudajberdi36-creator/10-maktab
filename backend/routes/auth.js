@@ -208,16 +208,43 @@ router.get('/login-logs', async (req, res) => {
   }
 });
 
-// BARCHA KIRISH LOGLARINI TOZALASH (frontend /api/auth/login-logs DELETE)
-router.delete('/login-logs', async (req, res) => {
+// KIRISH LOGLARINI TOZALASH (kunlar boyicha yoki hammasi)
+router.delete("/login-logs", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Token kerak" });
+    const decoded = jwt.verify(token, SECRET);
+    if (decoded.role !== "admin") return res.status(403).json({ message: "Faqat admin tozalay oladi" });
+
+    const days = parseInt(req.query.days);
+    if (!isNaN(days) && days > 0) {
+      await db.run_p("DELETE FROM login_logs WHERE created_at < NOW() - INTERVAL '" + days + " days'", []);
+      res.json({ message: days + " kundan eski yozuvlar tozalandi" });
+    } else {
+      await db.run_p("DELETE FROM login_logs", []);
+      res.json({ message: "Barcha kirish tarixi tozalandi" });
+    }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// KUNLAR BO'YICHA TOZALASH
+router.delete('/login-logs/clear-by-days', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'Token kerak' });
     const decoded = jwt.verify(token, SECRET);
     if (decoded.role !== 'admin') return res.status(403).json({ message: 'Faqat admin tozalay oladi' });
 
-    await db.run_p(`DELETE FROM login_logs`, []);
-    res.json({ message: "Kirish tarixi tozalandi ✅" });
+    const days = parseInt(req.query.days) || 10;
+    if (days < 1 || days > 365) return res.status(400).json({ message: "Kunlar 1 dan 365 gacha bo'lishi kerak" });
+
+    const result = await db.run_p(
+      `DELETE FROM login_logs WHERE created_at < NOW() - INTERVAL '${days} days'`,
+      []
+    );
+    res.json({ message: `${days} kundan eski yozuvlar muvaffaqiyatli tozalandi ✅` });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

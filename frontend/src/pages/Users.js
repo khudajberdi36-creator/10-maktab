@@ -30,9 +30,9 @@ export default function Users() {
   const [logFilter, setLogFilter] = useState('all');
   const [clearingLogs, setClearingLogs] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearDays, setClearDays] = useState(10);
 
   useEffect(() => { fetchUsers(); }, []);
-
   useEffect(() => {
     if (tab === 'logs' && logs.length === 0) fetchLogs();
   }, [tab]);
@@ -68,12 +68,13 @@ export default function Users() {
     try {
       setClearingLogs(true);
       const token = localStorage.getItem('token');
-      await axios.delete('/api/auth/login-logs', {
+      const res = await axios.delete(`/api/auth/login-logs/clear-by-days?days=${clearDays}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setLogs([]);
       setShowClearConfirm(false);
-      setSuccess("Kirish tarixi tozalandi ✅");
+      setSuccess(res.data.message || `${clearDays} kundan eski yozuvlar tozalandi ✅`);
+      setLogs([]);
+      fetchLogs();
       setTimeout(() => setSuccess(''), 3000);
     } catch (e) {
       setError(e.response?.data?.message || "Tozalashda xatolik yuz berdi");
@@ -145,14 +146,13 @@ export default function Users() {
     unique:  new Set(logs.filter(l => l.user_id).map(l => l.user_id)).size,
   };
 
-  const filteredLogs = logFilter === 'all'    ? logs
+  const filteredLogs = logFilter === 'all' ? logs
     : logFilter === 'failed' ? logs.filter(l => l.status === 'failed')
     : logs.filter(l => l.action === logFilter);
 
   const formatDate = (d) => {
     if (!d) return '—';
-    const date = new Date(d);
-    return date.toLocaleString('uz-UZ', {
+    return new Date(d).toLocaleString('uz-UZ', {
       day:'2-digit', month:'2-digit', year:'numeric',
       hour:'2-digit', minute:'2-digit'
     });
@@ -166,52 +166,39 @@ export default function Users() {
       {/* SARLAVHA */}
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24}}>
         <div>
-          <h2 style={{margin:0, fontSize:20, fontWeight:800, letterSpacing:'-0.3px'}}>👥 Foydalanuvchilar</h2>
+          <h2 style={{margin:0, fontSize:20, fontWeight:800}}>👥 Foydalanuvchilar</h2>
           <p style={{margin:'4px 0 0', color:'var(--text-muted)', fontSize:13.5}}>Tizim foydalanuvchilarini boshqaring</p>
         </div>
         {tab === 'users' && (
           <button className="btn btn-primary" onClick={openAdd}>➕ Yangi foydalanuvchi</button>
         )}
         {tab === 'logs' && (
-          <div style={{display:'flex', gap:8}}>
-            <button className="btn btn-outline" onClick={fetchLogs}>🔄 Yangilash</button>
-            <button
-              className="btn"
-              onClick={() => setShowClearConfirm(true)}
-              disabled={logs.length === 0}
-              style={{
-                background: logs.length === 0 ? '#f1f5f9' : '#fee2e2',
-                color: logs.length === 0 ? '#94a3b8' : '#ef4444',
-                border: logs.length === 0 ? '1px solid #e2e8f0' : '1px solid #fca5a5',
-                cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
-                fontWeight: 700
-              }}>
+          <div style={{display:'flex', gap:8, alignItems:'center'}}>
+            <button className="btn btn-outline" onClick={fetchLogs} disabled={logsLoading}>
+              🔄 Yangilash
+            </button>
+            <button className="btn" onClick={() => setShowClearConfirm(true)}
+              style={{background:'#fee2e2', color:'#ef4444', border:'1px solid #fca5a5', fontWeight:700}}>
               🗑️ Tarixni tozalash
             </button>
           </div>
         )}
       </div>
 
-      {/* TAB TUGMALAR */}
-      <div style={{display:'flex', gap:8, marginBottom:24, borderBottom:'2px solid var(--border-light)', paddingBottom:0}}>
+      {/* TAB */}
+      <div style={{display:'flex', gap:8, marginBottom:24, borderBottom:'2px solid var(--border-light)'}}>
         {[
           { key:'users', label:'👥 Foydalanuvchilar' },
           { key:'logs',  label:'📋 Kirish tarixi' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{
-              padding:'10px 20px', border:'none', background:'transparent',
-              fontSize:14, fontWeight:700, cursor:'pointer',
-              borderBottom: tab === t.key ? '2px solid var(--primary)' : '2px solid transparent',
-              color: tab === t.key ? 'var(--primary)' : 'var(--text-muted)',
-              marginBottom:'-2px', transition:'all 0.2s'
-            }}>
+            style={{padding:'10px 20px', border:'none', background:'transparent', fontSize:14, fontWeight:700, cursor:'pointer', borderBottom: tab===t.key?'2px solid var(--primary)':'2px solid transparent', color: tab===t.key?'var(--primary)':'var(--text-muted)', marginBottom:'-2px', transition:'all 0.2s'}}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ===== FOYDALANUVCHILAR TAB ===== */}
+      {/* FOYDALANUVCHILAR */}
       {tab === 'users' && (
         loading ? (
           <div style={{textAlign:'center', padding:60, color:'var(--text-muted)'}}>⏳ Yuklanmoqda...</div>
@@ -220,14 +207,8 @@ export default function Users() {
             <table style={{width:'100%', borderCollapse:'collapse'}}>
               <thead>
                 <tr style={{borderBottom:'2px solid var(--border-light)'}}>
-                  {['ID', 'F.I.SH', 'Foydalanuvchi nomi', 'Lavozim', 'Rang', "Qo'shilgan sana", 'Amallar'].map(h => (
-                    <th key={h} style={{
-                      padding:'12px 18px',
-                      textAlign: h==='Amallar' ? 'right' : 'left',
-                      fontSize:11, color:'var(--text-muted)',
-                      fontWeight:700, textTransform:'uppercase',
-                      letterSpacing:'0.6px', background:'#f6f9fc'
-                    }}>{h}</th>
+                  {['ID','F.I.SH','Foydalanuvchi nomi','Lavozim','Rang',"Qo'shilgan sana",'Amallar'].map(h => (
+                    <th key={h} style={{padding:'12px 18px', textAlign: h==='Amallar'?'right':'left', fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.6px', background:'#f6f9fc'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -235,83 +216,46 @@ export default function Users() {
                 {users.map((user) => {
                   const color = user.color || '#3b82f6';
                   return (
-                    <tr key={user.id}
-                      style={{borderBottom:'1px solid var(--border-light)', transition:'background 0.15s'}}
+                    <tr key={user.id} style={{borderBottom:'1px solid var(--border-light)', transition:'background 0.15s'}}
                       onMouseEnter={e => e.currentTarget.style.background='#f8fbff'}
                       onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-
                       <td style={{padding:'14px 18px'}}>
-                        <span style={{
-                          background:'#f1f5f9', borderRadius:6,
-                          padding:'3px 10px', fontFamily:'monospace',
-                          fontSize:12, fontWeight:700, color:'#475569'
-                        }}>#{user.id}</span>
+                        <span style={{background:'#f1f5f9', borderRadius:6, padding:'3px 10px', fontFamily:'monospace', fontSize:12, fontWeight:700, color:'#475569'}}>#{user.id}</span>
                       </td>
-
                       <td style={{padding:'14px 18px'}}>
                         <div style={{display:'flex', alignItems:'center', gap:12}}>
-                          <div style={{
-                            width:38, height:38, borderRadius:'50%',
-                            background: color + '22',
-                            border: `2px solid ${color}44`,
-                            color: color,
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontWeight:800, fontSize:16,
-                            boxShadow: `0 2px 8px ${color}30`,
-                            flexShrink:0,
-                          }}>
+                          <div style={{width:38, height:38, borderRadius:'50%', background:color+'22', border:`2px solid ${color}44`, color, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:16, flexShrink:0}}>
                             {user.full_name?.[0]?.toUpperCase()}
                           </div>
                           <span style={{fontWeight:700, fontSize:14}}>{user.full_name}</span>
                         </div>
                       </td>
-
-                      <td style={{padding:'14px 18px', color:'var(--text-muted)', fontFamily:'monospace', fontSize:13}}>
-                        @{user.username}
-                      </td>
-
+                      <td style={{padding:'14px 18px', color:'var(--text-muted)', fontFamily:'monospace', fontSize:13}}>@{user.username}</td>
                       <td style={{padding:'14px 18px'}}>
-                        <span style={{
-                          padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700,
-                          background: color + '18', color: color,
-                          border: `1px solid ${color}30`
-                        }}>
+                        <span style={{padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700, background:color+'18', color, border:`1px solid ${color}30`}}>
                           {roleLabels[user.role] || user.role}
                         </span>
                       </td>
-
                       <td style={{padding:'14px 18px'}}>
                         <div style={{display:'flex', alignItems:'center', gap:8}}>
-                          <div style={{
-                            width:24, height:24, borderRadius:'50%',
-                            background: color,
-                            boxShadow: `0 2px 8px ${color}60`,
-                            border:'2px solid white',
-                            outline: `2px solid ${color}40`
-                          }}/>
+                          <div style={{width:24, height:24, borderRadius:'50%', background:color, border:'2px solid white'}}/>
                           <span style={{fontSize:12, color:'var(--text-muted)', fontFamily:'monospace'}}>{color}</span>
                         </div>
                       </td>
-
                       <td style={{padding:'14px 18px', color:'var(--text-muted)', fontSize:13}}>
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('uz-UZ') : '—'}
                       </td>
-
                       <td style={{padding:'14px 18px', textAlign:'right'}}>
                         <div style={{display:'flex', gap:8, justifyContent:'flex-end'}}>
                           <button className="btn btn-outline btn-sm" onClick={() => openEdit(user)}>✏️ Tahrirlash</button>
-                          <button className="btn btn-sm"
-                            style={{background:'#fee2e2', color:'#ef4444', border:'1px solid #fca5a5'}}
-                            onClick={() => handleDelete(user)}>🗑️</button>
+                          <button className="btn btn-sm" style={{background:'#fee2e2', color:'#ef4444', border:'1px solid #fca5a5'}} onClick={() => handleDelete(user)}>🗑️</button>
                         </div>
                       </td>
                     </tr>
                   );
                 })}
                 {users.length === 0 && (
-                  <tr><td colSpan={7} style={{padding:40, textAlign:'center', color:'var(--text-muted)'}}>
-                    Foydalanuvchilar mavjud emas
-                  </td></tr>
+                  <tr><td colSpan={7} style={{padding:40, textAlign:'center', color:'var(--text-muted)'}}>Foydalanuvchilar mavjud emas</td></tr>
                 )}
               </tbody>
             </table>
@@ -319,67 +263,36 @@ export default function Users() {
         )
       )}
 
-      {/* ===== KIRISH TARIXI TAB ===== */}
+      {/* KIRISH TARIXI */}
       {tab === 'logs' && (
         <div>
-          {/* STATISTIKA KARTOCHKALAR */}
           <div className="stats-grid" style={{marginBottom:24}}>
-            <div className="stat-card">
-              <div className="stat-icon" style={{background:'#dbeafe'}}>📊</div>
-              <div>
-                <div className="stat-num">{logStats.total}</div>
-                <div className="stat-label">Jami urinishlar</div>
+            {[
+              {icon:'📋', num:logStats.total,   label:'Jami urinishlar',    bg:'#dbeafe', color:'inherit'},
+              {icon:'✅', num:logStats.success, label:'Muvaffaqiyatli',      bg:'#dcfce7', color:'var(--success)'},
+              {icon:'❌', num:logStats.failed,  label:'Muvaffaqiyatsiz',     bg:'#fee2e2', color:'var(--danger)'},
+              {icon:'👤', num:logStats.unique,  label:'Noyob foydalanuvchi', bg:'#f3e8ff', color:'#7c3aed'},
+            ].map((s,i) => (
+              <div key={i} className="stat-card">
+                <div className="stat-icon" style={{background:s.bg}}>{s.icon}</div>
+                <div>
+                  <div className="stat-num" style={{color:s.color}}>{s.num}</div>
+                  <div className="stat-label">{s.label}</div>
+                </div>
               </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{background:'#dcfce7'}}>✅</div>
-              <div>
-                <div className="stat-num" style={{color:'var(--success)'}}>{logStats.success}</div>
-                <div className="stat-label">Muvaffaqiyatli</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{background:'#fee2e2'}}>❌</div>
-              <div>
-                <div className="stat-num" style={{color:'var(--danger)'}}>{logStats.failed}</div>
-                <div className="stat-label">Muvaffaqiyatsiz</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{background:'#f3e8ff'}}>👤</div>
-              <div>
-                <div className="stat-num" style={{color:'#7c3aed'}}>{logStats.unique}</div>
-                <div className="stat-label">Noyob foydalanuvchi</div>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* FILTER */}
-          <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'wrap'}}>
-            {[
-              { key:'all',    label:'Barchasi' },
-              { key:'login',  label:'📥 Kirish' },
-              { key:'logout', label:'🚪 Chiqish' },
-              { key:'failed', label:'❌ Xatolik' },
-            ].map(f => (
+          <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'wrap', alignItems:'center'}}>
+            {[{key:'all',label:'Barchasi'},{key:'login',label:'🔐 Kirish'},{key:'logout',label:'🚪 Chiqish'},{key:'failed',label:'❌ Xatolik'}].map(f => (
               <button key={f.key} onClick={() => setLogFilter(f.key)}
-                style={{
-                  padding:'6px 16px', borderRadius:20, fontSize:13, cursor:'pointer',
-                  border: logFilter === f.key ? '1px solid var(--primary)' : '1px solid var(--border-light)',
-                  background: logFilter === f.key ? 'var(--primary)' : 'transparent',
-                  color: logFilter === f.key ? '#fff' : 'inherit',
-                  fontWeight: logFilter === f.key ? 700 : 400,
-                  transition:'all 0.2s'
-                }}>
+                style={{padding:'6px 16px', borderRadius:20, fontSize:13, cursor:'pointer', border: logFilter===f.key?'1px solid var(--primary)':'1px solid var(--border-light)', background: logFilter===f.key?'var(--primary)':'transparent', color: logFilter===f.key?'#fff':'inherit', fontWeight: logFilter===f.key?700:400, transition:'all 0.2s'}}>
                 {f.label}
               </button>
             ))}
-            <span style={{marginLeft:'auto', fontSize:13, color:'var(--text-muted)', alignSelf:'center'}}>
-              {filteredLogs.length} ta yozuv
-            </span>
+            <span style={{marginLeft:'auto', fontSize:13, color:'var(--text-muted)'}}>{filteredLogs.length} ta yozuv</span>
           </div>
 
-          {/* LOGLAR JADVALI */}
           <div className="card">
             {logsLoading ? (
               <div style={{textAlign:'center', padding:60, color:'var(--text-muted)'}}>⏳ Yuklanmoqda...</div>
@@ -388,96 +301,46 @@ export default function Users() {
                 <table style={{width:'100%', borderCollapse:'collapse', fontSize:13}}>
                   <thead>
                     <tr style={{borderBottom:'2px solid var(--border-light)'}}>
-                      {['#', 'User ID', 'Foydalanuvchi', 'Lavozim', 'Amal', 'Holat', 'IP manzil', 'Vaqt'].map(h => (
-                        <th key={h} style={{
-                          padding:'12px 16px', textAlign:'left',
-                          fontSize:11, color:'var(--text-muted)',
-                          fontWeight:700, textTransform:'uppercase',
-                          letterSpacing:'0.6px', background:'#f6f9fc',
-                          whiteSpace:'nowrap'
-                        }}>{h}</th>
+                      {['#','User ID','Foydalanuvchi','Lavozim','Amal','Holat','IP manzil','Vaqt'].map(h => (
+                        <th key={h} style={{padding:'12px 16px', textAlign:'left', fontSize:11, color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.6px', background:'#f6f9fc', whiteSpace:'nowrap'}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredLogs.map((log, i) => (
                       <tr key={log.id}
-                        style={{
-                          borderBottom:'1px solid var(--border-light)',
-                          animation:'fadeInUp 0.3s both',
-                          animationDelay:`${i * 0.02}s`,
-                          background: log.status === 'failed' ? '#fff5f5' : 'transparent',
-                          transition:'background 0.15s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = log.status==='failed' ? '#fee2e2' : '#f8fbff'}
-                        onMouseLeave={e => e.currentTarget.style.background = log.status==='failed' ? '#fff5f5' : 'transparent'}>
-
+                        style={{borderBottom:'1px solid var(--border-light)', background: log.status==='failed'?'#fff5f5':'transparent', transition:'background 0.15s'}}
+                        onMouseEnter={e => e.currentTarget.style.background = log.status==='failed'?'#fee2e2':'#f8fbff'}
+                        onMouseLeave={e => e.currentTarget.style.background = log.status==='failed'?'#fff5f5':'transparent'}>
                         <td style={{padding:'12px 16px', color:'var(--text-muted)', fontSize:12}}>{i+1}</td>
-
                         <td style={{padding:'12px 16px'}}>
-                          {log.user_id ? (
-                            <span style={{
-                              background:'#eff6ff', borderRadius:6,
-                              padding:'3px 10px', fontFamily:'monospace',
-                              fontSize:12, fontWeight:700, color:'#1d4ed8'
-                            }}>#{log.user_id}</span>
-                          ) : (
-                            <span style={{color:'var(--text-muted)', fontSize:12}}>—</span>
-                          )}
+                          {log.user_id ? <span style={{background:'#eff6ff', borderRadius:6, padding:'3px 10px', fontFamily:'monospace', fontSize:12, fontWeight:700, color:'#1d4ed8'}}>#{log.user_id}</span>
+                            : <span style={{color:'var(--text-muted)', fontSize:12}}>—</span>}
                         </td>
-
                         <td style={{padding:'12px 16px'}}>
                           <div style={{fontWeight:700}}>{log.full_name || '—'}</div>
-                          <div style={{fontSize:11, color:'var(--text-muted)', fontFamily:'monospace'}}>
-                            @{log.username}
-                          </div>
+                          <div style={{fontSize:11, color:'var(--text-muted)', fontFamily:'monospace'}}>@{log.username}</div>
                         </td>
-
                         <td style={{padding:'12px 16px'}}>
-                          {log.role ? (
-                            <span style={{
-                              padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
-                              background: log.role==='admin' ? '#dbeafe' : log.role==='direktor' ? '#f3e8ff' : '#dcfce7',
-                              color: log.role==='admin' ? '#1d4ed8' : log.role==='direktor' ? '#7c3aed' : '#16a34a',
-                            }}>
-                              {roleLabels[log.role] || log.role}
-                            </span>
-                          ) : <span style={{color:'var(--text-muted)'}}>—</span>}
+                          {log.role ? <span style={{padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background: log.role==='admin'?'#dbeafe':log.role==='direktor'?'#f3e8ff':'#dcfce7', color: log.role==='admin'?'#1d4ed8':log.role==='direktor'?'#7c3aed':'#16a34a'}}>{roleLabels[log.role]||log.role}</span>
+                            : <span style={{color:'var(--text-muted)'}}>—</span>}
                         </td>
-
                         <td style={{padding:'12px 16px'}}>
-                          <span style={{
-                            padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
-                            background: log.action==='login' ? '#dcfce7' : '#fff7ed',
-                            color: log.action==='login' ? '#16a34a' : '#c2410c',
-                          }}>
-                            {log.action === 'login' ? '📥 Kirdi' : '🚪 Chiqdi'}
+                          <span style={{padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background: log.action==='login'?'#dcfce7':'#fff7ed', color: log.action==='login'?'#16a34a':'#c2410c'}}>
+                            {log.action==='login'?'🔐 Kirdi':'🚪 Chiqdi'}
                           </span>
                         </td>
-
                         <td style={{padding:'12px 16px'}}>
-                          <span style={{
-                            padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
-                            background: log.status==='success' ? '#dcfce7' : '#fee2e2',
-                            color: log.status==='success' ? '#16a34a' : '#dc2626',
-                          }}>
-                            {log.status === 'success' ? '✅ Muvaffaqiyatli' : '❌ Xatolik'}
+                          <span style={{padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700, background: log.status==='success'?'#dcfce7':'#fee2e2', color: log.status==='success'?'#16a34a':'#dc2626'}}>
+                            {log.status==='success'?'✅ Muvaffaqiyatli':'❌ Xatolik'}
                           </span>
                         </td>
-
-                        <td style={{padding:'12px 16px', fontFamily:'monospace', fontSize:12, color:'var(--text-muted)'}}>
-                          {log.ip || '—'}
-                        </td>
-
-                        <td style={{padding:'12px 16px', fontSize:12, color:'var(--text-muted)', whiteSpace:'nowrap'}}>
-                          {formatDate(log.created_at)}
-                        </td>
+                        <td style={{padding:'12px 16px', fontFamily:'monospace', fontSize:12, color:'var(--text-muted)'}}>{log.ip||'—'}</td>
+                        <td style={{padding:'12px 16px', fontSize:12, color:'var(--text-muted)', whiteSpace:'nowrap'}}>{formatDate(log.created_at)}</td>
                       </tr>
                     ))}
                     {filteredLogs.length === 0 && !logsLoading && (
-                      <tr><td colSpan={8} style={{padding:40, textAlign:'center', color:'var(--text-muted)'}}>
-                        📭 Hech qanday ma'lumot topilmadi
-                      </td></tr>
+                      <tr><td colSpan={8} style={{padding:40, textAlign:'center', color:'var(--text-muted)'}}>📭 Hech qanday ma'lumot topilmadi</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -487,47 +350,45 @@ export default function Users() {
         </div>
       )}
 
-      {/* TARIXNI TOZALASH TASDIQLASH MODALI */}
+      {/* KUNLAR BO'YICHA TOZALASH MODALI */}
       {showClearConfirm && (
-        <div style={{
-          position:'fixed', inset:0,
-          background:'rgba(10,22,40,0.55)',
-          backdropFilter:'blur(4px)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          zIndex:1000, padding:20
-        }}>
-          <div style={{
-            background:'white', borderRadius:20, padding:36,
-            width:'100%', maxWidth:420,
-            boxShadow:'0 32px 80px rgba(0,0,0,0.25)',
-            animation:'scaleIn 0.3s ease',
-            textAlign:'center'
-          }}>
-            <div style={{fontSize:52, marginBottom:16}}>🗑️</div>
-            <h3 style={{margin:'0 0 10px', fontSize:18, fontWeight:800, color:'#0f1f35'}}>
-              Kirish tarixini tozalash
-            </h3>
-            <p style={{margin:'0 0 28px', color:'var(--text-muted)', fontSize:14, lineHeight:1.6}}>
-              Barcha <strong>{logs.length} ta</strong> kirish tarixi yozuvi o'chiriladi.<br/>
-              Bu amalni ortga qaytarib bo'lmaydi!
+        <div style={{position:'fixed', inset:0, background:'rgba(10,22,40,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:20}}>
+          <div style={{background:'white', borderRadius:20, padding:36, width:'100%', maxWidth:440, boxShadow:'0 32px 80px rgba(0,0,0,0.3)', textAlign:'center'}}>
+            <div style={{fontSize:52, marginBottom:12}}>🗑️</div>
+            <h3 style={{margin:'0 0 8px', fontSize:18, fontWeight:800, color:'#0f1f35'}}>Kirish tarixini tozalash</h3>
+            <p style={{margin:'0 0 24px', color:'var(--text-muted)', fontSize:14, lineHeight:1.6}}>
+              Necha kundan eski yozuvlarni o'chirmoqchisiz?
             </p>
+
+            <div style={{display:'flex', gap:8, justifyContent:'center', marginBottom:16, flexWrap:'wrap'}}>
+              {[3, 7, 10, 14, 30].map(d => (
+                <button key={d} onClick={() => setClearDays(d)}
+                  style={{padding:'8px 16px', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer', background: clearDays===d?'#ef4444':'#f1f5f9', color: clearDays===d?'white':'#475569', border: clearDays===d?'2px solid #ef4444':'2px solid #e2e8f0', transition:'all 0.2s'}}>
+                  {d} kun
+                </button>
+              ))}
+            </div>
+
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:24, justifyContent:'center'}}>
+              <span style={{fontSize:13, color:'var(--text-muted)'}}>Yoki o'zingiz kiriting:</span>
+              <input type="number" min="1" max="365" value={clearDays}
+                onChange={e => setClearDays(parseInt(e.target.value) || 1)}
+                style={{width:70, padding:'6px 10px', borderRadius:8, border:'1px solid #e2e8f0', fontSize:14, fontWeight:700, textAlign:'center'}}
+              />
+              <span style={{fontSize:13, color:'var(--text-muted)'}}>kun</span>
+            </div>
+
+            <div style={{padding:'10px 16px', background:'#fff5f5', borderRadius:10, marginBottom:24, fontSize:13, color:'#dc2626'}}>
+              ⚠️ <strong>{clearDays} kundan</strong> eski barcha yozuvlar o'chiriladi. Bu amalni qaytarib bo'lmaydi!
+            </div>
+
             <div style={{display:'flex', gap:12, justifyContent:'center'}}>
-              <button
-                className="btn btn-outline"
-                onClick={() => setShowClearConfirm(false)}
-                disabled={clearingLogs}
-                style={{minWidth:120}}>
+              <button className="btn btn-outline" onClick={() => setShowClearConfirm(false)} disabled={clearingLogs} style={{minWidth:130}}>
                 Bekor qilish
               </button>
-              <button
-                className="btn"
-                onClick={handleClearLogs}
-                disabled={clearingLogs}
-                style={{
-                  background:'#ef4444', color:'white',
-                  border:'none', minWidth:120, fontWeight:700
-                }}>
-                {clearingLogs ? '⏳ Tozalanmoqda...' : '🗑️ Ha, tozalash'}
+              <button className="btn" onClick={handleClearLogs} disabled={clearingLogs}
+                style={{background:'#ef4444', color:'white', border:'none', minWidth:130, fontWeight:700}}>
+                {clearingLogs ? '⏳ Tozalanmoqda...' : `🗑️ ${clearDays} kundan eskini o'chir`}
               </button>
             </div>
           </div>
@@ -536,45 +397,24 @@ export default function Users() {
 
       {/* FOYDALANUVCHI QO'SHISH / TAHRIRLASH MODALI */}
       {showModal && (
-        <div style={{
-          position:'fixed', inset:0,
-          background:'rgba(10,22,40,0.55)',
-          backdropFilter:'blur(4px)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          zIndex:1000, padding:20
-        }}>
-          <div style={{
-            background:'white', borderRadius:20, padding:36,
-            width:'100%', maxWidth:500,
-            boxShadow:'0 32px 80px rgba(0,0,0,0.25)',
-            animation:'scaleIn 0.3s ease'
-          }}>
-            <h3 style={{margin:'0 0 24px', fontSize:18, fontWeight:800, letterSpacing:'-0.3px'}}>
+        <div style={{position:'fixed', inset:0, background:'rgba(10,22,40,0.55)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:20}}>
+          <div style={{background:'white', borderRadius:20, padding:36, width:'100%', maxWidth:500, boxShadow:'0 32px 80px rgba(0,0,0,0.25)'}}>
+            <h3 style={{margin:'0 0 24px', fontSize:18, fontWeight:800}}>
               {editUser ? '✏️ Foydalanuvchini tahrirlash' : "➕ Yangi foydalanuvchi qo'shish"}
             </h3>
             {error && <div className="alert alert-danger">⚠️ {error}</div>}
-
             <div className="form-group" style={{marginBottom:16}}>
               <label className="form-label">To'liq ismi *</label>
-              <input className="form-control" placeholder="Masalan: Kamol Toshmatov"
-                value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} />
+              <input className="form-control" placeholder="Masalan: Kamol Toshmatov" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} />
             </div>
-
             <div className="form-group" style={{marginBottom:16}}>
               <label className="form-label">Foydalanuvchi nomi *</label>
-              <input className="form-control" placeholder="Masalan: direktor2"
-                value={form.username} onChange={e => setForm({...form, username: e.target.value})}
-                disabled={!!editUser}
-                style={editUser ? {background:'#f6f9fc', cursor:'not-allowed', opacity:0.7} : {}} />
+              <input className="form-control" placeholder="Masalan: direktor2" value={form.username} onChange={e => setForm({...form, username: e.target.value})} disabled={!!editUser} style={editUser?{background:'#f6f9fc',cursor:'not-allowed',opacity:0.7}:{}} />
             </div>
-
             <div className="form-group" style={{marginBottom:16}}>
               <label className="form-label">Parol {editUser ? "(o'zgartirish uchun kiriting)" : '*'}</label>
-              <input className="form-control" type="password"
-                placeholder={editUser ? "Bo'sh qoldiring — o'zgarmaydi" : "Parol kiriting"}
-                value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
+              <input className="form-control" type="password" placeholder={editUser?"Bo'sh qoldiring — o'zgarmaydi":"Parol kiriting"} value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
             </div>
-
             <div className="form-group" style={{marginBottom:16}}>
               <label className="form-label">Lavozim *</label>
               <select className="form-control" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
@@ -583,73 +423,36 @@ export default function Users() {
                 <option value="oquvchi">👨‍🏫 O'qituvchi</option>
               </select>
             </div>
-
-            {/* RANG TANLASH */}
             <div className="form-group" style={{marginBottom:28}}>
               <label className="form-label">🎨 Profil rangi</label>
               <div style={{marginTop:10}}>
                 <div style={{display:'flex', flexWrap:'wrap', gap:10, marginBottom:14}}>
                   {PRESET_COLORS.map(color => (
                     <button key={color} onClick={() => setForm({...form, color})}
-                      style={{
-                        width:32, height:32, borderRadius:'50%',
-                        background: color,
-                        border: form.color === color ? '3px solid #0f1f35' : '2px solid white',
-                        outline: form.color === color ? `3px solid ${color}` : 'none',
-                        outlineOffset:'2px',
-                        cursor:'pointer',
-                        boxShadow: `0 2px 8px ${color}50`,
-                        transition:'all 0.2s',
-                        transform: form.color === color ? 'scale(1.15)' : 'scale(1)'
-                      }}/>
+                      style={{width:32, height:32, borderRadius:'50%', background:color, border: form.color===color?'3px solid #0f1f35':'2px solid white', outline: form.color===color?`3px solid ${color}`:'none', outlineOffset:'2px', cursor:'pointer', transition:'all 0.2s', transform: form.color===color?'scale(1.15)':'scale(1)'}}/>
                   ))}
                 </div>
-
                 <div style={{display:'flex', alignItems:'center', gap:12}}>
-                  <input type="color" value={form.color}
-                    onChange={e => setForm({...form, color: e.target.value})}
-                    style={{width:44, height:44, border:'none', borderRadius:10, cursor:'pointer', padding:2, background:'none'}}/>
+                  <input type="color" value={form.color} onChange={e => setForm({...form, color: e.target.value})} style={{width:44, height:44, border:'none', borderRadius:10, cursor:'pointer', padding:2}}/>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:4, fontWeight:600}}>Maxsus rang tanlash</div>
-                    <div style={{
-                      display:'flex', alignItems:'center', gap:10,
-                      background: form.color + '15',
-                      border: `1px solid ${form.color}40`,
-                      borderRadius:8, padding:'8px 12px'
-                    }}>
+                    <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:4, fontWeight:600}}>Maxsus rang</div>
+                    <div style={{display:'flex', alignItems:'center', gap:10, background:form.color+'15', border:`1px solid ${form.color}40`, borderRadius:8, padding:'8px 12px'}}>
                       <div style={{width:20, height:20, borderRadius:'50%', background:form.color, flexShrink:0}}/>
                       <span style={{fontFamily:'monospace', fontSize:13, fontWeight:600, color:form.color}}>{form.color}</span>
                     </div>
                   </div>
                 </div>
-
-                <div style={{
-                  marginTop:14, padding:'12px 16px',
-                  background:'#f6f9fc', borderRadius:10,
-                  display:'flex', alignItems:'center', gap:12,
-                  border:'1px solid var(--border-light)'
-                }}>
-                  <div style={{
-                    width:40, height:40, borderRadius:'50%',
-                    background: form.color + '22',
-                    border: `2px solid ${form.color}44`,
-                    color: form.color,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontWeight:800, fontSize:17,
-                    boxShadow: `0 2px 10px ${form.color}30`
-                  }}>
+                <div style={{marginTop:14, padding:'12px 16px', background:'#f6f9fc', borderRadius:10, display:'flex', alignItems:'center', gap:12, border:'1px solid var(--border-light)'}}>
+                  <div style={{width:40, height:40, borderRadius:'50%', background:form.color+'22', border:`2px solid ${form.color}44`, color:form.color, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:17}}>
                     {form.full_name?.[0]?.toUpperCase() || 'A'}
                   </div>
                   <div>
                     <div style={{fontWeight:700, fontSize:14}}>{form.full_name || 'Ism Familiya'}</div>
-                    <span style={{padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700, background: form.color+'18', color: form.color}}>
-                      {roleLabels[form.role]}
-                    </span>
+                    <span style={{padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700, background:form.color+'18', color:form.color}}>{roleLabels[form.role]}</span>
                   </div>
                 </div>
               </div>
             </div>
-
             <div style={{display:'flex', gap:12, justifyContent:'flex-end'}}>
               <button className="btn btn-outline" onClick={() => setShowModal(false)} disabled={saving}>Bekor qilish</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
